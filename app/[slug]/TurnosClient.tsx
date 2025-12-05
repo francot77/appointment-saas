@@ -147,17 +147,10 @@ export default function TurnosClient({
     }
   }, [date, selectedServiceId, slug]);
   useEffect(() => {
-    // si falta algo, no hacemos nada
     if (!selectedServiceId || !date) return;
 
-    // opcional: si ya se está cargando, no dispares de nuevo
-    // if (loadingSlots) return;
-
-    // limpiás selección anterior
     setSelectedSlot(null);
     setMessage(null);
-
-    // llamás al loader
     loadSlots();
   }, [date, selectedServiceId, loadSlots]);
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -201,7 +194,7 @@ export default function TurnosClient({
       if (!res.ok) {
         setError(json.error || 'Error al solicitar el turno');
       } else {
-        // Nombre del servicio para mostrar en la pantalla de confirmación
+
         const selectedServiceName = services.find(
           (s) => s.id === selectedServiceId
         )?.name;
@@ -229,7 +222,7 @@ export default function TurnosClient({
     [services, selectedServiceId]
   );
 
-  // fecha mínima = hoy
+
   const today = useMemo(() => {
     const d = new Date();
     const y = d.getFullYear();
@@ -238,10 +231,16 @@ export default function TurnosClient({
     return `${y}-${m}-${day}`;
   }, []);
 
-  const businessInitial =
-    publicName.trim().charAt(0).toUpperCase() ||
-    businessName.trim().charAt(0).toUpperCase() ||
-    'B';
+  const businessInitial = (
+    publicName && publicName.trim()
+      ? publicName.trim()
+      : businessName && businessName.trim()
+        ? businessName.trim()
+        : 'B'
+  )
+    .charAt(0)
+    .toUpperCase();
+
 
   return (
     <main
@@ -249,7 +248,7 @@ export default function TurnosClient({
       style={bgStyle}
     >
       <div className="w-full max-w-xl space-y-5">
-        {/* Header */}
+
         <header className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
             {logoUrl ? (
@@ -278,7 +277,7 @@ export default function TurnosClient({
           </div>
         </header>
 
-        {/* Card principal */}
+
         <section className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl shadow-black/40 space-y-4">
           <div>
             <h2
@@ -293,7 +292,7 @@ export default function TurnosClient({
             </p>
           </div>
 
-          {/* Pasos */}
+
           <div className="flex gap-2 text-[11px] text-slate-300">
             <StepBadge
               active={!!selectedServiceId}
@@ -305,7 +304,7 @@ export default function TurnosClient({
             <StepBadge active={false} label="Tus datos" index={4} />
           </div>
 
-          {/* Servicio */}
+
           <div className="space-y-2">
             <label className="text-xs font-medium text-slate-200">
               1. Elegí el servicio
@@ -373,7 +372,7 @@ export default function TurnosClient({
               }}
               className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-slate-500"
             />
-            {date&&<button
+            {date && <button
               type="button"
               onClick={loadSlots}
               disabled={loadingSlots || !selectedServiceId || !date}
@@ -425,7 +424,7 @@ export default function TurnosClient({
                 disponibles&quot;.
               </p>
             )}
-            
+
           </div>
 
           {/* Form datos cliente */}

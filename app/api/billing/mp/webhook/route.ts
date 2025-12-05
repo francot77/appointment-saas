@@ -1,9 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // app/api/billing/mp/webhook/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { MercadoPagoConfig, Payment as MPPayment } from 'mercadopago';
 import dbConnect from '@/lib/db';
 import { Business } from '@/lib/models/Business';
-import { Payment } from '@/lib/models/Payments'; // tu modelo de pagos
+import { Payment } from '@/lib/models/Payments';
 
 export const runtime = 'nodejs';
 
@@ -11,39 +12,46 @@ export async function POST(req: NextRequest) {
   try {
     await dbConnect();
 
-    const accessToken = process.env.MP_ACCESS_TOKEN_TEST;
+    const isProd = process.env.NODE_ENV === 'production';
+
+    const accessToken = isProd
+      ? process.env.MP_ACCESS_TOKEN
+      : process.env.MP_ACCESS_TOKEN_TEST;
+
     if (!accessToken) {
+      console.error('[MP WEBHOOK] sin access token');
       return NextResponse.json(
-        { error: 'MP_ACCESS_TOKEN_TEST requerido' },
+        { error: 'Sin access token' },
         { status: 500 }
       );
     }
 
     const client = new MercadoPagoConfig({ accessToken });
+    const mpPayment = new MPPayment(client);
 
     const searchParams = req.nextUrl.searchParams;
     const topic = searchParams.get('topic') || searchParams.get('type');
     const paymentId =
       searchParams.get('id') || searchParams.get('data.id');
 
-    // MP manda varias cosas, pero para el caso de pago aprobado
-    // nos interesa cuando topic/type === 'payment'
     if (topic !== 'payment' || !paymentId) {
+      // MP a veces pega otras cosas, las ignoramos
       return NextResponse.json({ ok: true });
     }
 
-    const mpPayment = new MPPayment(client);
-    const p = await mpPayment.get({ id: paymentId });
+    const p: any = await mpPayment.get({ id: paymentId });
 
-    const status = p.status; // 'approved', 'pending', 'rejected', etc.
-    const externalReference = p.external_reference; // el business._id que pusimos
+    const status = p.status; // 'approved', 'pending', 'rejected'
+    const externalReference = p.external_reference;
 
     if (!externalReference) {
+      console.warn('[MP WEBHOOK] sin external_reference');
       return NextResponse.json({ ok: true });
     }
 
     const business = await Business.findById(externalReference);
     if (!business) {
+      console.warn('[MP WEBHOOK] business no encontrado', externalReference);
       return NextResponse.json({ ok: true });
     }
 
@@ -74,7 +82,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error('MP webhook error:', err);
+    console.error('[MP WEBHOOK] error', err);
     return NextResponse.json(
       { error: 'WEBHOOK_ERROR' },
       { status: 500 }
