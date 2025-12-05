@@ -3,7 +3,6 @@
 
 import { useMemo, useState } from 'react';
 
-const PRIMARY = '#6366F1';
 
 type BillingInfo = {
   planName: string;

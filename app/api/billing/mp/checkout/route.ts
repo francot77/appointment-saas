@@ -18,11 +18,9 @@ export async function POST(_req: NextRequest) {
       return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
     }
 
-    const isProd = process.env.NODE_ENV === 'production';
 
-    const accessToken = isProd
-      ? process.env.MP_ACCESS_TOKEN
-      : process.env.MP_ACCESS_TOKEN_TEST;
+    const accessToken = process.env.MP_ACCESS_TOKEN
+
 
     if (!accessToken) {
       return NextResponse.json(
@@ -34,43 +32,18 @@ export async function POST(_req: NextRequest) {
     const client = new MercadoPagoConfig({ accessToken });
     const preference = new Preference(client);
 
-    const externalReference = business._id.toString();
+    const appUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      process.env.APP_URL ||
+      'http://localhost:3000'; // fallback en dev
 
-    // back_urls según entorno
-    let backUrls: {
-      success: string;
-      failure: string;
-      pending: string;
+    const backUrls = {
+      success: `${appUrl}/billing?status=success`,
+      failure: `${appUrl}/billing?status=failure`,
+      pending: `${appUrl}/billing?status=pending`,
     };
 
-    let notificationUrl: string | undefined;
-
-    if (isProd) {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-      if (!appUrl) {
-        return NextResponse.json(
-          { error: 'Falta NEXT_PUBLIC_APP_URL en producción' },
-          { status: 500 }
-        );
-      }
-
-      backUrls = {
-        success: `${appUrl}/billing`,
-        failure: `${appUrl}/billing`,
-        pending: `${appUrl}/billing`,
-      };
-
-      notificationUrl = `${appUrl}/api/billing/mp/webhook`;
-    } else {
-      // Dev / sandbox: usamos una URL https dummy porque localhost da problemas
-      backUrls = {
-        success: 'https://www.google.com',
-        failure: 'https://www.google.com',
-        pending: 'https://www.google.com',
-      };
-      notificationUrl = undefined;
-    }
-
+    // y cuando armás el body de la preferencia:
     const pref = await preference.create({
       body: {
         items: [
@@ -78,22 +51,20 @@ export async function POST(_req: NextRequest) {
             id: 'basic-monthly',
             title: 'Suscripción mensual turnos',
             description: 'Plan básico - 1 mes',
-            quantity: 1,
             unit_price: PRICE_BASIC,
             currency_id: 'ARS',
+            quantity: 1,
           },
         ],
-        external_reference: externalReference,
+        external_reference: business._id.toString(),
         back_urls: backUrls,
         auto_return: 'approved',
-        ...(notificationUrl
-          ? { notification_url: notificationUrl }
-          : {}),
+        notification_url: `${appUrl}/api/billing/mp/webhook`,
       },
     });
 
+
     const initPoint =
-      (pref as any).sandbox_init_point ??
       (pref as any).init_point ??
       null;
 
