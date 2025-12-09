@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
   try {
     await dbConnect();
 
-    const accessToken = process.env.MP_WEBHOOK_KEY;
+    const accessToken = process.env.MP_ACCESS_TOKEN_TEST;
 
     if (!accessToken) {
       console.error('[MP WEBHOOK] sin access token');
