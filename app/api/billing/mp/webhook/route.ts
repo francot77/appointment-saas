@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { MercadoPagoConfig, Payment as MPPayment } from 'mercadopago';
 import dbConnect from '@/lib/db';
 import { Business } from '@/lib/models/Business';
-import { Payment } from '@/lib/models/Payments';
+import { Payment } from '@/lib/models/Payments'; // asegúrate que el archivo se llama así
 
 export const runtime = 'nodejs';
 
@@ -12,7 +12,6 @@ export async function POST(req: NextRequest) {
   try {
     await dbConnect();
 
-    // Determinar si estamos en producción o test
     const isProduction = process.env.NODE_ENV === 'production';
     const accessToken = isProduction
       ? process.env.MP_ACCESS_TOKEN_PROD
@@ -33,26 +32,58 @@ export async function POST(req: NextRequest) {
     const mpPayment = new MPPayment(client);
 
     const searchParams = req.nextUrl.searchParams;
-    const topic = searchParams.get('topic') || searchParams.get('type');
-    const paymentId =
-      searchParams.get('id') || searchParams.get('data.id');
+    const queryParams = Object.fromEntries(searchParams.entries());
+
+    // 1) Intentamos sacar topic e id de la query
+    let topic =
+      searchParams.get('topic') ||
+      searchParams.get('type') ||
+      null;
+
+    let paymentId =
+      searchParams.get('id') ||
+      searchParams.get('data.id') ||
+      null;
+
+    // 2) También leemos el body (formato que muestra tu captura)
+    let body: any = null;
+    const contentType = req.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      try {
+        body = await req.json();
+      } catch {
+        body = null;
+      }
+    }
+
+    // Si no teníamos topic/id en la query, los sacamos del body
+    if (!topic && body?.type) {
+      topic = body.type; // 'payment'
+    }
+
+    if (!paymentId && body?.data?.id) {
+      paymentId = String(body.data.id); // '137203024656'
+    }
 
     console.log('[MP WEBHOOK] Received notification', {
+      method: req.method,
       topic,
       paymentId,
+      queryParams,
+      body,
       environment: isProduction ? 'production' : 'test',
     });
 
-    // Solo procesar notificaciones de pagos
+    // Si sigue sin haber topic o id, no podemos hacer nada útil
     if (topic !== 'payment' || !paymentId) {
-      console.log('[MP WEBHOOK] Ignoring non-payment notification', { topic });
+      console.log('[MP WEBHOOK] Ignoring notification', { topic, paymentId });
       return NextResponse.json({ ok: true });
     }
 
-    // Obtener detalles del pago desde MercadoPago
+    // Ahora sí: consultamos el pago a MP
     const p: any = await mpPayment.get({ id: paymentId });
 
-    const status = p.status; // 'approved', 'pending', 'rejected', 'in_process', etc.
+    const status = p.status; // 'approved', 'pending', 'rejected', etc.
     const externalReference = p.external_reference;
     const mpPaymentId = String(p.id);
 
@@ -64,7 +95,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // Verificar idempotencia: si ya procesamos este pago, no hacer nada
+    // Idempotencia
     const existingPayment = await Payment.findOne({ mpPaymentId });
     if (existingPayment) {
       console.log('[MP WEBHOOK] Payment already processed', {
@@ -87,7 +118,6 @@ export async function POST(req: NextRequest) {
     const amount = p.transaction_amount ?? 0;
     const currency = p.currency_id ?? 'ARS';
 
-    // Calcular período de suscripción (30 días desde ahora)
     const periodFrom = new Date();
     const periodTo = new Date(
       periodFrom.getTime() + 30 * 24 * 60 * 60 * 1000
@@ -101,14 +131,18 @@ export async function POST(req: NextRequest) {
       currency,
     });
 
-    // Crear registro de pago para todos los estados
     const paymentRecord = await Payment.create({
       businessId: business._id,
       amount,
       currency,
       method: 'mp',
       mpPaymentId,
-      status: status === 'approved' ? 'approved' : status === 'rejected' ? 'rejected' : 'pending',
+      status:
+        status === 'approved'
+          ? 'approved'
+          : status === 'rejected'
+          ? 'rejected'
+          : 'pending',
       periodFrom,
       periodTo,
       rawPayload: p,
@@ -119,9 +153,7 @@ export async function POST(req: NextRequest) {
       status: paymentRecord.status,
     });
 
-    // Actualizar business según el estado del pago
     if (status === 'approved') {
-      // Usar actualización atómica para evitar race conditions
       const updatedBusiness = await Business.findByIdAndUpdate(
         business._id,
         {
@@ -140,32 +172,15 @@ export async function POST(req: NextRequest) {
       } else {
         console.log('[MP WEBHOOK] Business updated successfully', {
           businessId: externalReference,
-          paidUntil: periodTo,
-          status: 'active',
+          paidUntil: updatedBusiness.paidUntil,
+          status: updatedBusiness.status,
         });
       }
-    } else if (status === 'pending') {
-      // Para pagos pendientes, no actualizamos el estado del negocio
-      // pero registramos el pago para seguimiento
-      console.log('[MP WEBHOOK] Payment is pending', {
-        paymentId: mpPaymentId,
-        businessId: externalReference,
-        statusDetail: p.status_detail,
-      });
-    } else if (status === 'rejected') {
-      // Para pagos rechazados, no actualizamos el estado del negocio
-      console.log('[MP WEBHOOK] Payment was rejected', {
-        paymentId: mpPaymentId,
-        businessId: externalReference,
-        statusDetail: p.status_detail,
-      });
     } else {
-      // Otros estados (in_process, etc.)
-      console.log('[MP WEBHOOK] Payment in other status', {
+      console.log('[MP WEBHOOK] Payment not approved', {
         paymentId: mpPaymentId,
         status,
         statusDetail: p.status_detail,
-        businessId: externalReference,
       });
     }
 
