@@ -19,7 +19,7 @@ export async function POST(_req: NextRequest) {
     }
 
 
-    const accessToken = process.env.MP_ACCESS_TOKEN
+    const accessToken = process.env.MP_ACCESS_TOKEN_TEST;
 
 
     if (!accessToken) {
@@ -38,9 +38,9 @@ export async function POST(_req: NextRequest) {
       'http://localhost:3000'; // fallback en dev
 
     const backUrls = {
-      success: `${appUrl}/billing?status=success`,
-      failure: `${appUrl}/billing?status=failure`,
-      pending: `${appUrl}/billing?status=pending`,
+      success: `google.com`, //`${appUrl}/billing?status=success`,
+      failure: `google.com`, //`${appUrl}/billing?status=failure`,
+      pending: `google.com`, //`${appUrl}/billing?status=pending`,
     };
 
     // y cuando armás el body de la preferencia:
