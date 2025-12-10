@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { PINK, ScheduleDayType } from './types';
+import { ScheduleDayType, BrandConfig, DEFAULT_BRAND } from './types';
 
 function weekdayLabel(w: number) {
   const names = [
@@ -14,7 +14,9 @@ function weekdayLabel(w: number) {
   return names[w] || `Día ${w}`;
 }
 
-export default function ScheduleTab() {
+export default function ScheduleTab({ brand }: { brand?: BrandConfig }) {
+  const theme = brand ?? DEFAULT_BRAND;
+
   const [scheduleDays, setScheduleDays] = useState<ScheduleDayType[]>([]);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [errorSchedule, setErrorSchedule] = useState<string | null>(null);
@@ -91,36 +93,35 @@ export default function ScheduleTab() {
   }
 
   async function saveDay(day: ScheduleDayType) {
-  setSavingWeekday(day.weekday);
-  setErrorSchedule(null);
-  try {
-    const res = await fetch('/api/admin/schedule', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        weekday: day.weekday,
-        blocks: day.blocks, // [{start, end, enabled}]
-      }),
-    });
+    setSavingWeekday(day.weekday);
+    setErrorSchedule(null);
+    try {
+      const res = await fetch('/api/admin/schedule', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          weekday: day.weekday,
+          blocks: day.blocks, // [{start, end}]
+        }),
+      });
 
-    const data = await res.json();
-    if (!res.ok) {
-      setErrorSchedule(data.error || 'Error guardando día');
-      return;
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorSchedule(data.error || 'Error guardando día');
+        return;
+      }
+
+      // opcional: refrescás estado con lo que devuelve el server
+      setScheduleDays((prev) =>
+        prev.map((d) => (d.weekday === data.weekday ? data : d))
+      );
+    } catch (e) {
+      console.error(e);
+      setErrorSchedule('Error guardando día');
+    } finally {
+      setSavingWeekday(null);
     }
-
-    // opcional: refrescás estado con lo que devuelve el server
-    setScheduleDays(prev =>
-      prev.map(d => (d.weekday === data.weekday ? data : d))
-    );
-  } catch (e) {
-    console.error(e);
-    setErrorSchedule('Error guardando día');
-  } finally {
-    setSavingWeekday(null);
   }
-}
-
 
   return (
     <section className="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-4">
@@ -203,9 +204,7 @@ export default function ScheduleTab() {
                 </div>
                 <button
                   type="button"
-                  onClick={() =>
-                    deleteBlock(day.weekday, index)
-                  }
+                  onClick={() => deleteBlock(day.weekday, index)}
                   className="text-[11px] text-slate-400 hover:text-red-400"
                 >
                   x
@@ -225,8 +224,12 @@ export default function ScheduleTab() {
                 type="button"
                 onClick={() => saveDay(day)}
                 disabled={savingWeekday === day.weekday}
-                className="text-[11px] px-3 py-1 rounded-full"
-                style={{ backgroundColor: PINK, color: '#020617' }}
+                className="text-[11px] px-3 py-1 rounded-full shadow-sm disabled:opacity-60"
+                style={{
+                  backgroundColor: theme.primary,
+                  color: theme.textOnPrimary,
+                  boxShadow: `0 0 10px ${theme.primary}40`,
+                }}
               >
                 {savingWeekday === day.weekday
                   ? 'Guardando...'

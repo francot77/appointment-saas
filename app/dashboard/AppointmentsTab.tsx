@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import { useEffect, useState } from 'react';
-import { AdminAppointment, PINK } from './types';
+import { AdminAppointment, BrandConfig, DEFAULT_BRAND } from './types';
 import Link from 'next/link';
 
 function getWeekRange(dateStr: string) {
@@ -49,6 +48,7 @@ function statusLabel(status: AdminAppointment['status']) {
 }
 
 function formatShortDate(dateStr: string) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [y, m, d] = dateStr.split('-');
   return `${d}/${m}`;
 }
@@ -84,7 +84,9 @@ type Slot = {
   endTime: string;
 };
 
-export default function AppointmentsTab() {
+export default function AppointmentsTab({ brand }: { brand?: BrandConfig }) {
+  const theme = brand ?? DEFAULT_BRAND;
+
   const [date, setDate] = useState('');
   const [viewMode, setViewMode] = useState<'day' | 'week'>('week');
   const [statusFilter, setStatusFilter] = useState<
@@ -366,8 +368,6 @@ export default function AppointmentsTab() {
     try {
       const params = new URLSearchParams({
         date: rescheduleDate,
-        // asumimos que AdminAppointment incluye serviceId
-        // si no, agregalo al tipo y al backend
         serviceId: (rescheduleAppt as any).serviceId,
       });
 
@@ -424,7 +424,7 @@ export default function AppointmentsTab() {
         }
       );
 
-            const json = await res.json();
+      const json = await res.json();
 
       if (!res.ok) {
         setRescheduleError(json.error || 'Error reprogramando el turno');
@@ -432,7 +432,7 @@ export default function AppointmentsTab() {
         return;
       }
 
-      // 👉 abrir WhatsApp igual que en confirm/reject/remind
+      // abrir WhatsApp si corresponde
       if (json.waUrl) {
         window.open(json.waUrl, '_blank');
       }
@@ -452,49 +452,6 @@ export default function AppointmentsTab() {
       );
 
       // actualizar resumen hoy/mañana
-      setSummary((prev) =>
-        prev
-          ? {
-              today: prev.today.map((a) =>
-                a.id === rescheduleAppt.id
-                  ? {
-                      ...a,
-                      date: json.date,
-                      startTime: json.startTime,
-                      endTime: json.endTime,
-                    }
-                  : a
-              ),
-              tomorrow: prev.tomorrow.map((a) =>
-                a.id === rescheduleAppt.id
-                  ? {
-                      ...a,
-                      date: json.date,
-                      startTime: json.startTime,
-                      endTime: json.endTime,
-                    }
-                  : a
-              ),
-            }
-          : prev
-      );
-
-      
-
-
-      setAppointments((prev) =>
-        prev.map((a) =>
-          a.id === rescheduleAppt.id
-            ? {
-                ...a,
-                date: json.date,
-                startTime: json.startTime,
-                endTime: json.endTime,
-              }
-            : a
-        )
-      );
-
       setSummary((prev) =>
         prev
           ? {
@@ -590,7 +547,7 @@ export default function AppointmentsTab() {
                           <span>
                             <span
                               className="font-semibold"
-                              style={{ color: PINK }}
+                              style={{ color: theme.primary }}
                             >
                               {a.startTime}
                             </span>{' '}
@@ -606,14 +563,16 @@ export default function AppointmentsTab() {
                       {!a.reminderSent ? (
                         <button
                           onClick={() => handleReminder(a)}
-                          className="text-[10px] px-2 py-1 rounded-full border border-pink-500 text-pink-300 hover:bg-pink-500/10 whitespace-nowrap"
+                          className="text-[10px] px-2 py-1 rounded-full border text-slate-50 hover:opacity-90 whitespace-nowrap"
+                          style={{
+                            borderColor: theme.primary,
+                            color: theme.primary,
+                          }}
                         >
                           Recordatorio
                         </button>
                       ) : (
-                        <button
-                          onClick={() => handleReminder(a)}
-                        >
+                        <button onClick={() => handleReminder(a)}>
                           <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/40">
                             Recordatorio enviado
                           </span>
@@ -656,7 +615,7 @@ export default function AppointmentsTab() {
                           <span>
                             <span
                               className="font-semibold"
-                              style={{ color: PINK }}
+                              style={{ color: theme.primary }}
                             >
                               {a.startTime}
                             </span>{' '}
@@ -672,14 +631,16 @@ export default function AppointmentsTab() {
                       {!a.reminderSent ? (
                         <button
                           onClick={() => handleReminder(a)}
-                          className="text-[10px] px-2 py-1 rounded-full border border-pink-500 text-pink-300 hover:bg-pink-500/10 whitespace-nowrap"
+                          className="text-[10px] px-2 py-1 rounded-full border text-slate-50 hover:opacity-90 whitespace-nowrap"
+                          style={{
+                            borderColor: theme.primary,
+                            color: theme.primary,
+                          }}
                         >
                           Recordatorio
                         </button>
                       ) : (
-                        <button
-                          onClick={() => handleReminder(a)}
-                        >
+                        <button onClick={() => handleReminder(a)}>
                           <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/40">
                             Recordatorio enviado
                           </span>
@@ -695,11 +656,9 @@ export default function AppointmentsTab() {
       </section>
 
       {/* FILTROS PRINCIPALES */}
-      <section className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <section className="bg-slate-900 border border-slate-800 rounded-xl my-2 p-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-slate-400">
-            Fecha base
-          </label>
+          <label className="text-xs text-slate-400">Fecha base</label>
           <input
             type="date"
             value={date}
@@ -736,9 +695,7 @@ export default function AppointmentsTab() {
             </button>
           </div>
           {viewMode === 'week' && weekLabel && (
-            <p className="text-[10px] text-slate-500">
-              {weekLabel}
-            </p>
+            <p className="text-[10px] text-slate-500">{weekLabel}</p>
           )}
         </div>
 
@@ -791,9 +748,7 @@ export default function AppointmentsTab() {
         </div>
 
         {errorAppointments && (
-          <p className="text-xs text-red-400">
-            {errorAppointments}
-          </p>
+          <p className="text-xs text-red-400">{errorAppointments}</p>
         )}
 
         {!loadingAppointments &&
@@ -809,7 +764,7 @@ export default function AppointmentsTab() {
             <div
               key={a.id}
               className="border-l-4 bg-slate-950 rounded-lg px-3 py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
-              style={{ borderLeftColor: a.serviceColor || PINK }}
+              style={{ borderLeftColor: a.serviceColor || theme.primary }}
             >
               <div className="flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -818,7 +773,7 @@ export default function AppointmentsTab() {
                   </span>
                   <span
                     className="text-sm font-semibold"
-                    style={{ color: PINK }}
+                    style={{ color: theme.primary }}
                   >
                     {a.startTime}
                   </span>
@@ -828,7 +783,7 @@ export default function AppointmentsTab() {
                   <span
                     className={`text-[10px] px-2 py-0.5 rounded-full ${
                       a.status === 'request'
-                        ? 'bg-pink-500/20 text-pink-300'
+                        ? 'bg-amber-500/20 text-amber-300'
                         : a.status === 'confirmed'
                         ? 'bg-emerald-500/20 text-emerald-300'
                         : 'bg-red-700/50 text-slate-200'
@@ -875,14 +830,16 @@ export default function AppointmentsTab() {
                 <div className="flex flex-row gap-2 justify-end">
                   <button
                     onClick={() => handleAction(a, 'confirm')}
-                    className="text-xs px-3 py-1 rounded-md"
+                    className="text-xs px-3 py-1 rounded-md shadow-sm"
                     style={{
-                      backgroundColor: PINK,
-                      color: '#0f172a',
+                      backgroundColor: theme.primary,
+                      color: theme.textOnPrimary,
+                      boxShadow: `0 0 10px ${theme.primary}40`,
                     }}
                   >
                     Confirmar
                   </button>
+
                   <button
                     onClick={() => handleAction(a, 'reject')}
                     className="text-xs px-3 py-1 rounded-md border border-slate-600 text-slate-100 hover:bg-slate-800"
@@ -960,11 +917,16 @@ export default function AppointmentsTab() {
                             onClick={() =>
                               setRescheduleTime(slot.startTime)
                             }
-                            className={`rounded-full py-1.5 border text-center ${
+                            className="rounded-full py-1.5 border text-center"
+                            style={
                               isSelected
-                                ? 'border-pink-400 bg-pink-500 text-slate-900'
-                                : 'border-slate-700 bg-slate-950 text-slate-100 hover:bg-slate-900'
-                            }`}
+                                ? {
+                                    borderColor: theme.primary,
+                                    backgroundColor: theme.primary,
+                                    color: theme.textOnPrimary,
+                                  }
+                                : {}
+                            }
                           >
                             {slot.startTime}
                           </button>
@@ -1009,11 +971,12 @@ export default function AppointmentsTab() {
                 <button
                   type="submit"
                   disabled={rescheduleSaving}
-                  className="text-xs px-3 py-1 rounded-md"
+                  className="text-xs px-3 py-1 rounded-md shadow-sm"
                   style={{
-                    backgroundColor: PINK,
-                    color: '#0f172a',
+                    backgroundColor: theme.primary,
+                    color: theme.textOnPrimary,
                     opacity: rescheduleSaving ? 0.6 : 1,
+                    boxShadow: `0 0 10px ${theme.primary}40`,
                   }}
                 >
                   {rescheduleSaving ? 'Guardando...' : 'Guardar cambio'}
