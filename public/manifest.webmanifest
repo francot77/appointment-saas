@@ -1,7 +1,7 @@
 {
-  "name": "Atómica Nails Turnos",
-  "short_name": "Atómica Nails",
-  "description": "Agenda de turnos para Atómica Nails.",
+  "name": "FezTime",
+  "short_name": "FezTime",
+  "description": "Agenda de turnos online con confirmación por WhatsApp.",
   "lang": "es-AR",
   "start_url": "/",
   "scope": "/",

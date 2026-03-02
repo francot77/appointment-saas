@@ -1,0 +1,12 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="FezTime">
+  <rect x="24" y="24" width="208" height="208" rx="56" fill="#0B1220"/>
+  <rect x="24" y="24" width="208" height="208" rx="56" stroke="#1F2A44" stroke-width="4"/>
+  <path d="M76 104C76 95.1634 83.1634 88 92 88H164C172.837 88 180 95.1634 180 104V168C180 176.837 172.837 184 164 184H92C83.1634 184 76 176.837 76 168V104Z" fill="#0F172A" stroke="#2B3B62" stroke-width="4"/>
+  <path d="M76 116H180" stroke="#2B3B62" stroke-width="4"/>
+  <path d="M96 72V96" stroke="#06B6D4" stroke-width="10" stroke-linecap="round"/>
+  <path d="M160 72V96" stroke="#4F46E5" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="104" cy="140" r="10" fill="#4F46E5"/>
+  <circle cx="136" cy="140" r="10" fill="#06B6D4"/>
+  <circle cx="168" cy="140" r="10" fill="#4F46E5"/>
+  <path d="M92 168H164" stroke="#1F2A44" stroke-width="4" stroke-linecap="round"/>
+</svg>

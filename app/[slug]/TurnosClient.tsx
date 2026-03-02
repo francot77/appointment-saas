@@ -322,7 +322,7 @@ export default function TurnosClient({
                   setSelectedSlot(null);
                   setMessage(null);
                 }}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-slate-500"
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
               >
                 <option value="">Elegí un servicio</option>
                 {services.map((s) => (
@@ -370,13 +370,13 @@ export default function TurnosClient({
                 setSelectedSlot(null);
                 setMessage(null);
               }}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-slate-500"
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
             />
             {date && <button
               type="button"
               onClick={loadSlots}
               disabled={loadingSlots || !selectedServiceId || !date}
-              className="w-full bg-slate-100 text-slate-900 rounded-full py-2 text-xs font-medium mt-1 disabled:opacity-60"
+              className="w-full bg-slate-100 text-slate-900 rounded-full py-2 text-xs font-medium mt-1 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
             >
               {loadingSlots ? 'Actualizando horarios...' : 'Actualizar horarios'}
             </button>}
@@ -398,7 +398,7 @@ export default function TurnosClient({
                       key={slot.startTime}
                       type="button"
                       onClick={() => setSelectedSlot(slot)}
-                      className="rounded-full py-1.5 border text-center transition-colors"
+                      className="rounded-full py-1.5 border text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
                       style={
                         isSelected
                           ? {
@@ -452,7 +452,7 @@ export default function TurnosClient({
                 </label>
                 <input
                   name="clientName"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-slate-500"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
                   required
                 />
               </div>
@@ -463,7 +463,7 @@ export default function TurnosClient({
                 </label>
                 <input
                   name="clientPhone"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-slate-500"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
                   placeholder="Ej: 11 2345 6789"
                   required
                 />
@@ -475,14 +475,14 @@ export default function TurnosClient({
                 </label>
                 <textarea
                   name="notes"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm min-h-[70px] focus:outline-none focus:ring-1 focus:ring-slate-500"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm min-h-[70px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full rounded-full py-2 text-sm font-medium shadow-md shadow-black/40 disabled:opacity-60"
+                className="w-full rounded-full py-2 text-sm font-medium shadow-md shadow-black/40 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
                 style={{ backgroundColor: primaryColor, color: '#020617' }}
               >
                 {submitting

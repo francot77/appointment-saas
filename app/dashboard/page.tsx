@@ -7,6 +7,8 @@ import { getCurrentBusiness } from '@/lib/currentBusiness';
 import { BusinessSettings } from '@/lib/models/BusinessSettings';
 // o el nombre real que uses
 
+export const dynamic = 'force-dynamic';
+
 export default async function DashboardPage() {
   const business = await getCurrentBusiness();
 

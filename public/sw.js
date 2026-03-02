@@ -1,4 +1,4 @@
-const CACHE_NAME = 'atomica-nails-v1';
+const CACHE_NAME = 'feztime-v1';
 
 const URLS_TO_CACHE = [
   '/',

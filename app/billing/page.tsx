@@ -4,6 +4,8 @@ import dbConnect from '@/lib/db';
 import { getCurrentBusiness } from '@/lib/currentBusiness';
 import BillingClient from './BillingClient';
 
+export const dynamic = 'force-dynamic';
+
 type Props = {
   searchParams?: Promise<{ status?: string }>;
 };

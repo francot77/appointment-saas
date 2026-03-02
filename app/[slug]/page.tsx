@@ -6,6 +6,8 @@ import { Business } from '@/lib/models/Business';
 import { BusinessSettings } from '@/lib/models/BusinessSettings';
 import BusinessLandingClient from './BusinessLandingClient';
 
+export const dynamic = 'force-dynamic';
+
 type Props = { params: Promise<{ slug: string }> };
 
 export default async function PublicBusinessHome(props: Props) {

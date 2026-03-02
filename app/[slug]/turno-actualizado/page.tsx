@@ -5,6 +5,8 @@ import type { Metadata } from 'next';
 import dbConnect from '@/lib/db';
 import { Business } from '@/lib/models/Business';
 
+export const dynamic = 'force-dynamic';
+
 type Props = {
   params: Promise<{ slug: string }>;
   searchParams?: Promise<{

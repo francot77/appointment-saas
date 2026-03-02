@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { BRAND_NAME, BRAND_PRIMARY } from '../dashboard/types';
 
 type Service = {
   id: string;
@@ -14,8 +15,6 @@ type Slot = {
   startTime: string;
   endTime: string;
 };
-
-const PINK = '#e87dad';
 
 export default function TurnosPage() {
   const [services, setServices] = useState<Service[]>([]);
@@ -131,7 +130,7 @@ export default function TurnosPage() {
         );
         setSelectedSlot(null);
         setSlots([]);
-        
+
       }
     } catch (e) {
       console.error(e);
@@ -142,6 +141,7 @@ export default function TurnosPage() {
   }
 
   const selectedService = services.find((s) => s.id === selectedServiceId);
+  const minDate = new Date().toISOString().slice(0, 10);
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 flex justify-center px-4 py-6">
@@ -151,13 +151,13 @@ export default function TurnosPage() {
           <div className="flex items-center gap-2">
             <div
               className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-lg shadow-black/40"
-              style={{ backgroundColor: PINK, color: '#020617' }}
+              style={{ backgroundColor: BRAND_PRIMARY, color: '#020617' }}
             >
-              A
+              {BRAND_NAME.charAt(0).toUpperCase()}
             </div>
             <div>
               <h1 className="text-sm font-semibold tracking-wide">
-                Atómica Nails
+                {BRAND_NAME}
               </h1>
               <p className="text-[11px] text-slate-400">
                 Pedí tu turno online
@@ -203,7 +203,7 @@ export default function TurnosPage() {
                   setSelectedSlot(null);
                   setMessage(null);
                 }}
-                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-pink-400"
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
               >
                 <option value="">Elegí un servicio</option>
                 {services.map((s) => (
@@ -244,20 +244,20 @@ export default function TurnosPage() {
             <input
               type="date"
               value={date}
-              min={'2026-01-01'}
+              min={minDate}
               onChange={(e) => {
                 setDate(e.target.value);
                 setSlots([]);
                 setSelectedSlot(null);
                 setMessage(null);
               }}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:ring-1 focus:ring-pink-400"
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
             />
             <button
               type="button"
               onClick={loadSlots}
               disabled={loadingSlots || !selectedServiceId || !date}
-              className="w-full bg-slate-100 text-slate-900 rounded-full py-2 text-xs font-medium mt-1 disabled:opacity-60"
+              className="w-full bg-slate-100 text-slate-900 rounded-full py-2 text-xs font-medium mt-1 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
             >
               {loadingSlots ? 'Buscando horarios...' : 'Ver horarios disponibles'}
             </button>
@@ -279,11 +279,10 @@ export default function TurnosPage() {
                       key={slot.startTime}
                       type="button"
                       onClick={() => setSelectedSlot(slot)}
-                      className={`rounded-full py-1.5 border text-center ${
-                        isSelected
-                          ? 'border-pink-400 bg-pink-500 text-slate-900'
+                      className={`rounded-full py-1.5 border text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${isSelected
+                          ? 'border-indigo-400 bg-indigo-500 text-slate-50'
                           : 'border-slate-700 bg-slate-950 text-slate-100 hover:bg-slate-900'
-                      }`}
+                        }`}
                     >
                       {slot.startTime}
                     </button>
@@ -322,7 +321,7 @@ export default function TurnosPage() {
                 </label>
                 <input
                   name="clientName"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-pink-400"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
                   required
                 />
               </div>
@@ -333,7 +332,7 @@ export default function TurnosPage() {
                 </label>
                 <input
                   name="clientPhone"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-pink-400"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
                   placeholder="Ej: 11 2345 6789"
                   required
                 />
@@ -345,15 +344,15 @@ export default function TurnosPage() {
                 </label>
                 <textarea
                   name="notes"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm min-h-[70px] focus:outline-none focus:ring-1 focus:ring-pink-400"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm min-h-[70px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full rounded-full py-2 text-sm font-medium shadow-md shadow-black/40 disabled:opacity-60"
-                style={{ backgroundColor: PINK, color: '#020617' }}
+                className="w-full rounded-full py-2 text-sm font-medium shadow-md shadow-black/40 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+                style={{ backgroundColor: BRAND_PRIMARY, color: '#020617' }}
               >
                 {submitting ? 'Enviando solicitud...' : 'Enviar solicitud de turno'}
               </button>
@@ -380,18 +379,16 @@ function StepBadge(props: { index: number; label: string; active: boolean }) {
   return (
     <div className="flex items-center gap-1">
       <div
-        className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] border ${
-          active
-            ? 'bg-slate-100 text-slate-900 border-slate-100'
-            : 'bg-slate-900 text-slate-200 border-slate-600'
-        }`}
+        className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] border ${active
+          ? 'bg-slate-100 text-slate-900 border-slate-100'
+          : 'bg-slate-900 text-slate-200 border-slate-600'
+          }`}
       >
         {index}
       </div>
       <span
-        className={`text-[11px] ${
-          active ? 'text-slate-100' : 'text-slate-400'
-        }`}
+        className={`text-[11px] ${active ? 'text-slate-100' : 'text-slate-400'
+          }`}
       >
         {label}
       </span>

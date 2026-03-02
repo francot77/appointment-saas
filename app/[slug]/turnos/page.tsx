@@ -7,6 +7,8 @@ import { Service } from '@/lib/models/Service';
 import { BusinessSettings } from '@/lib/models/BusinessSettings';
 import TurnosClient from '../TurnosClient';
 
+export const dynamic = 'force-dynamic';
+
 type Props = { params: Promise<{ slug: string }> };
 
 export default async function PublicBusinessPage(props: Props) {

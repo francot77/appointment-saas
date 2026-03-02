@@ -3,14 +3,15 @@ import type { Metadata } from 'next';
 import ServiceWorkerRegister from './ServiceWorkerRegister';
 import { Analytics } from '@vercel/analytics/next';
 
-const siteUrl = 'https://atomicanails.vercel.app'; // TODO: cambiá por tu dominio real
+const siteUrl = 'https://feztime.app';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: 'TurnosYa – Agenda de turnos online',
-    template: '%s | TurnosYa',
-  }, manifest: '/manifest.webmanifest',
+    default: 'FezTime – Agenda online',
+    template: '%s | FezTime',
+  },
+  manifest: '/manifest.webmanifest',
   icons: {
     icon: [
       { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
@@ -23,16 +24,16 @@ export const metadata: Metadata = {
   description:
     'Reservá turnos desde tu celular. Elegí servicio, fecha y horario y recibí la confirmación por WhatsApp.',
   openGraph: {
-    title: 'TurnosYa – Agenda de turnos online',
+    title: 'FezTime – Agenda online',
     description:
-      'Pedí tu turno de uñas de forma simple: seleccioná servicio, fecha y horario desde tu celular.',
+      'Reservá turnos de forma simple: seleccioná servicio, fecha y horario desde tu celular.',
     url: '/',
-    siteName: 'TurnosYa',
+    siteName: 'FezTime',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'TurnosYa – Agenda de turnos online',
+    title: 'FezTime – Agenda online',
     description:
       'Reservá turnos desde tu celular con confirmación por WhatsApp.',
   },

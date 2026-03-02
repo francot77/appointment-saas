@@ -375,13 +375,13 @@ export default function MagicLinkClient({ token }: Props) {
                           setSuccessMessage(null);
                           setError(null);
                         }}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
                       />
                       <button
                         type="button"
                         onClick={loadSlots}
                         disabled={loadingSlots || !date}
-                        className="w-full rounded-full py-1.5 text-xs font-medium bg-slate-100 text-slate-900 disabled:opacity-60"
+                        className="w-full rounded-full py-1.5 text-xs font-medium bg-slate-100 text-slate-900 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
                       >
                         {loadingSlots
                           ? 'Buscando horarios...'
@@ -405,7 +405,7 @@ export default function MagicLinkClient({ token }: Props) {
                                 key={slot.startTime}
                                 type="button"
                                 onClick={() => setSelectedSlot(slot)}
-                                className={`rounded-full py-1.5 border text-center ${
+                                className={`rounded-full py-1.5 border text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
                                   isSelected
                                     ? 'border-indigo-400 bg-indigo-500 text-slate-900'
                                     : 'border-slate-700 bg-slate-950 text-slate-100 hover:bg-slate-900'

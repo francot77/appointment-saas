@@ -1,5 +1,6 @@
 // app/page.tsx
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function LandingPage() {
   return (
@@ -8,17 +9,18 @@ export default function LandingPage() {
         {/* Top App Bar */}
         <header className="sticky top-0 z-10 flex h-16 items-center justify-between bg-[#101622]/90 px-4 backdrop-blur-sm border-b border-slate-800">
           <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/15 border border-blue-500/40">
-              {/* Iconito calendario simple */}
-              <div className="flex flex-col items-center justify-center text-[9px] leading-none text-blue-300">
-                <span>LU</span>
-                <span className="mt-0.5 h-[1px] w-5 bg-blue-400/80" />
-                <span className="mt-1 text-xs font-semibold">12</span>
-              </div>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 border border-indigo-400/30 overflow-hidden">
+              <Image
+                src="/feztime-logo.svg"
+                alt="FezTime"
+                width={36}
+                height={36}
+                priority
+              />
             </div>
             <div className="flex flex-col">
               <span className="text-lg font-bold tracking-[-0.03em]">
-                TurnosSaaS
+                FezTime
               </span>
               <span className="text-[11px] text-slate-400">
                 Agenda online para barberías y estética
@@ -28,7 +30,7 @@ export default function LandingPage() {
 
           <a
             href="#cta"
-            className="flex h-10 items-center justify-center rounded-full bg-blue-500 px-4 text-xs font-bold text-white shadow-md shadow-blue-500/30 hover:bg-blue-400 transition-colors"
+            className="flex h-10 items-center justify-center rounded-full bg-indigo-600 px-4 text-xs font-bold text-white shadow-md shadow-indigo-600/30 hover:bg-indigo-500 transition-colors"
           >
             Probar Gratis
           </a>
@@ -53,7 +55,7 @@ export default function LandingPage() {
                   <a
                     id="cta"
                     href="#pricing"
-                    className="inline-flex h-11 w-full max-w-xs items-center justify-center rounded-full bg-blue-500 px-6 text-sm font-semibold tracking-[0.03em] text-white shadow-lg shadow-blue-500/30 hover:bg-blue-400 transition-colors"
+                    className="inline-flex h-11 w-full max-w-xs items-center justify-center rounded-full bg-indigo-600 px-6 text-sm font-semibold tracking-[0.03em] text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 transition-colors"
                   >
                     Probar gratis 14 días
                   </a>
@@ -102,7 +104,7 @@ export default function LandingPage() {
                             className={[
                               'flex h-6 w-6 items-center justify-center rounded-full text-[11px]',
                               i === 1
-                                ? 'bg-blue-500 text-white'
+                                ? 'bg-indigo-600 text-white'
                                 : 'bg-slate-900 text-slate-300',
                             ].join(' ')}
                           >
@@ -222,12 +224,12 @@ export default function LandingPage() {
                 ¿Listo para dejar el cuaderno y el caos de mensajes?
               </h2>
               <p className="mx-auto max-w-md text-sm sm:text-base text-slate-400">
-                Arrancá hoy mismo y probá TurnosSaaS en tu barbería o estética.
+                Arrancá hoy mismo y probá FezTime en tu barbería o estética.
                 Si no te ordena la vida, lo dejás y listo.
               </p>
               <Link
                 href="/register"
-                className="mt-2 flex h-11 w-full max-w-xs items-center justify-center rounded-full bg-blue-500 px-5 text-sm font-semibold tracking-[0.03em] text-white shadow-lg shadow-blue-500/30 hover:bg-blue-400 transition-colors"
+                className="mt-2 flex h-11 w-full max-w-xs items-center justify-center rounded-full bg-indigo-600 px-5 text-sm font-semibold tracking-[0.03em] text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 transition-colors"
               >
                 Comenzar prueba gratuita
               </Link>
@@ -242,19 +244,19 @@ export default function LandingPage() {
         <footer className="border-t border-slate-800 bg-[#0b1019] px-4 py-6">
           <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-3 text-center text-[11px] text-slate-500 sm:flex-row sm:text-left">
             <p>
-              © {new Date().getFullYear()} TurnosSaaS. Todos los derechos
+              © {new Date().getFullYear()} FezTime. Todos los derechos
               reservados.
             </p>
             <div className="flex gap-4">
               <Link
                 href="/terms"
-                className="hover:text-blue-400 transition-colors"
+                className="hover:text-indigo-300 transition-colors"
               >
                 Términos
               </Link>
               <Link
                 href="/privacy"
-                className="hover:text-blue-400 transition-colors"
+                className="hover:text-indigo-300 transition-colors"
               >
                 Privacidad
               </Link>
@@ -275,7 +277,7 @@ type FeatureCardProps = {
 function FeatureCard({ title, desc, icon }: FeatureCardProps) {
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-950/80 p-4">
-      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs">
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10 border border-indigo-400/30 text-indigo-200 text-xs">
         {icon}
       </div>
       <div className="flex flex-col gap-1">

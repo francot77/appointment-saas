@@ -76,7 +76,7 @@ export default function DashboardClient({ businessName, avatarUrl, brand }: Prop
             <button
               type="button"
               onClick={logout}
-              className="inline-flex items-center justify-center rounded-full border border-slate-700 bg-slate-900/80 px-2.5 py-1.5 text-[11px] text-slate-300 hover:bg-slate-800/80 hover:text-slate-50 transition-colors"
+              className="inline-flex items-center justify-center rounded-full border border-slate-700 bg-slate-900/80 px-2.5 py-1.5 text-[11px] text-slate-300 hover:bg-slate-800/80 hover:text-slate-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
             >
               <span className="mr-1.5 text-xs">⎋</span>
               <span>Salir</span>
@@ -151,7 +151,7 @@ function BottomNavItem({ label, icon, active, onClick, theme }: BottomNavItemPro
     <button
       type="button"
       onClick={onClick}
-      className="relative inline-flex flex-col items-center justify-center gap-0.5 h-full px-1 text-[11px] focus:outline-none"
+      className="relative inline-flex flex-col items-center justify-center gap-0.5 h-full px-1 text-[11px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200/70 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 rounded-xl"
     >
       <div
         className="flex h-7 w-7 items-center justify-center rounded-2xl text-base transition-colors"

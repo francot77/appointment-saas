@@ -55,13 +55,13 @@ export default function RegisterPage() {
         {/* Columna izquierda: copy / contexto */}
         <div className="flex flex-col justify-between gap-6">
           <div className="space-y-4">
-            <div className="inline-flex items-center gap-2 rounded-full border border-blue-500/40 bg-blue-500/10 px-3 py-1 text-[11px] text-blue-200">
+            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-400/40 bg-indigo-500/10 px-3 py-1 text-[11px] text-indigo-200">
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
               <span>Configura tu agenda en menos de 5 minutos</span>
             </div>
 
             <h1 className="text-2xl sm:text-3xl font-bold tracking-[-0.04em]">
-              Crear tu cuenta de TurnosSaaS
+              Crear tu cuenta de FezTime
             </h1>
             <p className="text-sm sm:text-[15px] text-slate-400 leading-relaxed max-w-md">
               Vamos a crear tu negocio y tu usuario para que puedas empezar a
@@ -70,7 +70,7 @@ export default function RegisterPage() {
             </p>
 
             <div className="mt-2 space-y-2 text-[12px] text-slate-400">
-             
+
             </div>
           </div>
 
@@ -88,9 +88,9 @@ export default function RegisterPage() {
                 <label className="block text-xs font-medium text-slate-300">
                   Tu nombre<span className="text-red-400 ml-0.5">*</span>
                 </label>
-                
+
                 <input
-                  className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-500/60"
+                  className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus-visible:outline-none focus-visible:border-indigo-400 focus-visible:ring-2 focus-visible:ring-indigo-500/50"
                   value={name}
                   onChange={e => setName(e.target.value)}
                   placeholder="Ej: Ana"
@@ -103,7 +103,7 @@ export default function RegisterPage() {
                   <span className="text-red-400 ml-0.5">*</span>
                 </label>
                 <input
-                  className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-500/60"
+                  className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus-visible:outline-none focus-visible:border-indigo-400 focus-visible:ring-2 focus-visible:ring-indigo-500/50"
                   value={businessName}
                   onChange={e => setBusinessName(e.target.value)}
                   placeholder="Ej: Barbería Centro"
@@ -119,7 +119,7 @@ export default function RegisterPage() {
                   <span className="text-red-400 ml-0.5">*</span>
                 </label>
                 <input
-                  className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-500/60"
+                  className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus-visible:outline-none focus-visible:border-indigo-400 focus-visible:ring-2 focus-visible:ring-indigo-500/50"
                   value={phone}
                   onChange={e => setPhone(e.target.value)}
                   placeholder="Ej: 11 2345 6789"
@@ -130,7 +130,7 @@ export default function RegisterPage() {
                   Dirección (opcional)
                 </label>
                 <input
-                  className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-500/60"
+                  className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus-visible:outline-none focus-visible:border-indigo-400 focus-visible:ring-2 focus-visible:ring-indigo-500/50"
                   value={address}
                   onChange={e => setAddress(e.target.value)}
                   placeholder="Ej: Av. Siempre Viva 123"
@@ -145,7 +145,7 @@ export default function RegisterPage() {
               </label>
               <input
                 type="email"
-                className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-500/60"
+                className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus-visible:outline-none focus-visible:border-indigo-400 focus-visible:ring-2 focus-visible:ring-indigo-500/50"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="Ej: tuemail@negocio.com"
@@ -160,7 +160,7 @@ export default function RegisterPage() {
               </label>
               <input
                 type="password"
-                className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-500/60"
+                className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus-visible:outline-none focus-visible:border-indigo-400 focus-visible:ring-2 focus-visible:ring-indigo-500/50"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
                 minLength={6}
@@ -182,7 +182,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full mt-2 inline-flex items-center justify-center gap-2 rounded-full px-3 py-2.5 text-sm font-semibold text-slate-50 bg-gradient-to-r from-blue-500 to-blue-600 shadow-lg shadow-blue-500/30 hover:from-blue-400 hover:to-blue-500 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full mt-2 inline-flex items-center justify-center gap-2 rounded-full px-3 py-2.5 text-sm font-semibold text-slate-50 bg-gradient-to-r from-indigo-600 to-indigo-500 shadow-lg shadow-indigo-600/25 hover:from-indigo-500 hover:to-indigo-400 transition-colors disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
             >
               {loading && (
                 <span className="inline-block h-3 w-3 rounded-full border border-slate-950 border-t-transparent animate-spin" />
@@ -200,7 +200,7 @@ export default function RegisterPage() {
             ¿Ya tenés cuenta?{' '}
             <Link
               href="/login"
-              className="text-blue-500 hover:text-[#f29bc4] hover:underline"
+              className="text-indigo-300 hover:text-indigo-200 hover:underline"
             >
               Iniciar sesión
             </Link>

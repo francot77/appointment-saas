@@ -42,7 +42,7 @@ export default function LoginForm({ from }: { from: string }) {
           Usuario
         </label>
         <input
-          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
@@ -56,7 +56,7 @@ export default function LoginForm({ from }: { from: string }) {
         </label>
         <input
           type="password"
-          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400"
+          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
@@ -70,7 +70,7 @@ export default function LoginForm({ from }: { from: string }) {
 
       <button
         disabled={loading}
-        className="w-full mt-2 rounded-full py-2 text-sm font-medium shadow-md shadow-black/40 disabled:opacity-60"
+        className="w-full mt-2 rounded-full py-2 text-sm font-medium shadow-md shadow-black/40 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
         style={{ backgroundColor: BRAND_PRIMARY, color: '#020617' }}
       >
         {loading ? 'Ingresando...' : 'Entrar al panel'}

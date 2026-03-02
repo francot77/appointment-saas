@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import LoginForm from './LoginForm';
-import { BRAND_PRIMARY } from '../dashboard/types';
+import { BRAND_NAME, BRAND_PRIMARY, BRAND_SECONDARY } from '../dashboard/types';
 
 
 
@@ -31,7 +31,7 @@ export default async function LoginPage(
         />
         <div
           className="absolute bottom-0 right-0 w-80 h-80 rounded-full opacity-30 blur-3xl"
-          style={{ backgroundColor: '#22c55e' }}
+          style={{ backgroundColor: BRAND_SECONDARY }}
         />
       </div>
 
@@ -44,14 +44,14 @@ export default async function LoginPage(
               className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-lg shadow-black/40"
               style={{ backgroundColor: BRAND_PRIMARY, color: '#020617' }}
             >
-              A
+              {BRAND_NAME.charAt(0).toUpperCase()}
             </div>
             <div>
               <h1 className="text-sm font-semibold tracking-wide">
-                Gestor de turnos
+                {BRAND_NAME}
               </h1>
               <p className="text-[11px] text-slate-400">
-                Panel de administracion
+                Panel de administración
               </p>
             </div>
           </div>
@@ -66,7 +66,7 @@ export default async function LoginPage(
 
         <h2 className="text-lg font-semibold mb-1">Iniciar sesión</h2>
         <p className="text-xs text-slate-400 mb-4">
-          Solo el adminstrador del estudio puede acceder a este panel para ver y
+          Solo el administrador del negocio puede acceder a este panel para ver y
           confirmar turnos.
         </p>
 

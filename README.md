@@ -1,36 +1,51 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FezTime
 
-## Getting Started
+SaaS de turnos/agenda online construido con Next.js (App Router), NextAuth y MongoDB.
 
-First, run the development server:
+## Requisitos
+
+- Node.js 20+
+- MongoDB (o MongoDB Atlas)
+
+## Variables de entorno
+
+Configurar al menos:
+
+- `MONGODB_URI` — cadena de conexión a MongoDB
+
+Para pagos y URLs:
+
+- `NEXT_PUBLIC_APP_URL` (o `APP_URL`) — URL pública de la app (para back_urls)
+- `MP_ACCESS_TOKEN_TEST` — token de MercadoPago (test)
+- `MP_ACCESS_TOKEN_PROD` — token de MercadoPago (producción)
+
+Recomendado en producción:
+
+- `NEXTAUTH_SECRET`
+- `NEXTAUTH_URL`
+
+## Desarrollo
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abrir http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Calidad y build
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run lint
+npx tsc --noEmit
+npm run build
+```
 
-## Learn More
+## Cambios de branding y UX (FezTime)
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Reemplazo de nombres anteriores por “FezTime” en UI y metadatos.
+- Actualización de PWA manifests y cache name del service worker.
+- Nuevo asset de logo: `public/feztime-logo.svg` y uso en el landing.
+- Ajustes de accesibilidad: focus-visible rings en navegación, formularios y CTAs.
+- Ajustes visuales: paleta indigo/cyan, tipografía base y consistencia de estilos.
+- Enlaces de footer corregidos con páginas `terms` y `privacy` (placeholders).

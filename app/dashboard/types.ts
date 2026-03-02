@@ -1,7 +1,7 @@
 
-export const BRAND_NAME = 'TurnoFlow'; // o el nombre que quieras
-export const BRAND_PRIMARY = '#282bf7ff'; 
-export const BRAND_SECONDARY = '#22C55E'; // verde de acento
+export const BRAND_NAME = 'FezTime';
+export const BRAND_PRIMARY = '#4F46E5';
+export const BRAND_SECONDARY = '#06B6D4';
 export const PINK = '#e87dad';
 
 export type AdminAppointment = {
@@ -48,8 +48,8 @@ export type BrandConfig = {
 };
 
 export const DEFAULT_BRAND: BrandConfig = {
-  primary: '#3b82f6',      // fallback si no hay settings
-  secondary: '#ec4899',
+  primary: BRAND_PRIMARY,
+  secondary: BRAND_SECONDARY,
   textOnPrimary: '#020617',
   background: '#050816',
 };
