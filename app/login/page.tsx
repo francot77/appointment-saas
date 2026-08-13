@@ -15,11 +15,12 @@ export const metadata: Metadata = {
 
 export default async function LoginPage(
   props: {
-    searchParams?: Promise<{ from?: string }>;
+    searchParams?: Promise<{ from?: string; registered?: string }>;
   }
 ) {
   const searchParams = await props.searchParams;
   const from = searchParams?.from || '/dashboard';
+  const registered = searchParams?.registered === '1';
 
   return (
     <main className="min-h-screen relative bg-slate-950 text-slate-100 flex items-center justify-center px-4">
@@ -69,6 +70,12 @@ export default async function LoginPage(
           Solo el administrador del negocio puede acceder a este panel para ver y
           confirmar turnos.
         </p>
+
+        {registered && (
+          <p className="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
+            Cuenta creada. Ingresá para configurar tu primera página de turnos.
+          </p>
+        )}
 
         {/* Form client-side */}
         <LoginForm from={from} />

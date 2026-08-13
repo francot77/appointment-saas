@@ -2,7 +2,7 @@
 // app/dashboard/DashboardClient.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { signOut } from 'next-auth/react';
 
 import AppointmentsTab from './AppointmentsTab';
@@ -16,20 +16,115 @@ type TabKey = 'appointments' | 'services' | 'schedule' | 'calendar' | 'settings'
 
 type Props = {
   businessName: string;
+  businessSlug: string;
   avatarUrl?: string | null;
   brand?: BrandConfig;
+};
+
+type ActivationState = {
+  checklist: {
+    serviceConfigured: boolean;
+    workingHoursConfigured: boolean;
+    profileConfigured: boolean;
+    publicLinkAvailable: boolean;
+  };
+  slug: string | null;
 };
 
 async function logout() {
   await signOut({ callbackUrl: '/login' });
 }
 
-export default function DashboardClient({ businessName, avatarUrl, brand }: Props) {
+export default function DashboardClient({ businessName, businessSlug, avatarUrl, brand }: Props) {
   const [tab, setTab] = useState<TabKey>('appointments');
+  const [activation, setActivation] = useState<ActivationState | null>(null);
+  const [activationError, setActivationError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const theme = brand ?? DEFAULT_BRAND;
   const initial =
     businessName?.trim().charAt(0).toUpperCase() || 'B';
+
+  async function loadActivation() {
+    try {
+      const res = await fetch('/api/admin/activation');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'No se pudo cargar la activación');
+      setActivation(data);
+      setActivationError(null);
+    } catch {
+      setActivationError('No se pudo cargar el checklist de activación.');
+    }
+  }
+
+  useEffect(() => {
+    loadActivation();
+
+    function refreshWhenVisible() {
+      if (document.visibilityState === 'visible') {
+        loadActivation();
+      }
+    }
+
+    window.addEventListener('focus', loadActivation);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.removeEventListener('focus', loadActivation);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, []);
+
+  const publicUrl = `/${encodeURIComponent(activation?.slug || businessSlug)}`;
+
+  async function copyPublicUrl() {
+    const absoluteUrl = `${window.location.origin}${publicUrl}`;
+    try {
+      let copiedWithClipboard = false;
+      if (navigator.clipboard) {
+        try {
+          await navigator.clipboard.writeText(absoluteUrl);
+          copiedWithClipboard = true;
+        } catch {
+          // Fall through to the legacy copy path when the Clipboard API rejects.
+        }
+      }
+      if (!copiedWithClipboard) {
+        const textarea = document.createElement('textarea');
+        textarea.value = absoluteUrl;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        const copied = document.execCommand('copy');
+        textarea.remove();
+        if (!copied) throw new Error('COPY_UNAVAILABLE');
+      }
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setActivationError('No se pudo copiar el enlace.');
+    }
+  }
+
+  async function sharePublicUrl() {
+    const absoluteUrl = `${window.location.origin}${publicUrl}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: businessName, url: absoluteUrl });
+        return;
+      } catch {
+        return;
+      }
+    }
+    await copyPublicUrl();
+  }
+
+  function goTo(nextTab: TabKey) {
+    setTab(nextTab);
+    loadActivation();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
   return (
     <main
@@ -85,9 +180,18 @@ export default function DashboardClient({ businessName, avatarUrl, brand }: Prop
 
           {/* Contenido scrollable */}
           <div className="flex-1 px-3 pt-3 pb-4 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-800 scrollbar-track-transparent">
+            <ActivationChecklist
+              activation={activation}
+              error={activationError}
+              publicUrl={publicUrl}
+              copied={copied}
+              onCopy={copyPublicUrl}
+              onShare={sharePublicUrl}
+              onNavigate={goTo}
+            />
             {tab === 'appointments' && <AppointmentsTab brand={theme} />}
-            {tab === 'services' && <ServicesTab brand={theme}/>}
-            {tab === 'schedule' && <ScheduleTab brand={theme}/>}
+            {tab === 'services' && <ServicesTab brand={theme} />}
+            {tab === 'schedule' && <ScheduleTab brand={theme} />}
             {tab === 'calendar' && <CalendarTab brand={theme}/>}
             {tab === 'settings' && <SettingsTab />}
           </div>
@@ -101,40 +205,115 @@ export default function DashboardClient({ businessName, avatarUrl, brand }: Prop
             label="Turnos"
             icon="📅"
             active={tab === 'appointments'}
-            onClick={() => setTab('appointments')}
+            onClick={() => goTo('appointments')}
             theme={theme}
           />
           <BottomNavItem
             label="Servicios"
             icon="✂️"
             active={tab === 'services'}
-            onClick={() => setTab('services')}
+            onClick={() => goTo('services')}
             theme={theme}
           />
           <BottomNavItem
             label="Horarios"
             icon="⏰"
             active={tab === 'schedule'}
-            onClick={() => setTab('schedule')}
+            onClick={() => goTo('schedule')}
             theme={theme}
           />
           <BottomNavItem
             label="Calendario"
             icon="🗓️"
             active={tab === 'calendar'}
-            onClick={() => setTab('calendar')}
+            onClick={() => goTo('calendar')}
             theme={theme}
           />
           <BottomNavItem
             label="Ajustes"
             icon="⚙️"
             active={tab === 'settings'}
-            onClick={() => setTab('settings')}
+            onClick={() => goTo('settings')}
             theme={theme}
           />
         </div>
       </nav>
     </main>
+  );
+}
+
+function ActivationChecklist({
+  activation,
+  error,
+  publicUrl,
+  copied,
+  onCopy,
+  onShare,
+  onNavigate,
+}: {
+  activation: ActivationState | null;
+  error: string | null;
+  publicUrl: string;
+  copied: boolean;
+  onCopy: () => void;
+  onShare: () => void;
+  onNavigate: (tab: TabKey) => void;
+}) {
+  if (error) {
+    return <p className="mb-3 text-[11px] text-amber-300">{error}</p>;
+  }
+  if (!activation) {
+    return <p className="mb-3 text-[11px] text-slate-500">Revisando la configuración inicial...</p>;
+  }
+
+  const items = [
+    { key: 'serviceConfigured', label: 'Crear tu primer servicio', tab: 'services' as const },
+    { key: 'workingHoursConfigured', label: 'Definir tus horarios', tab: 'schedule' as const },
+    { key: 'profileConfigured', label: 'Completar el perfil público', tab: 'settings' as const },
+  ] as const;
+  const completed = items.filter((item) => activation.checklist[item.key]).length;
+  const complete = completed === items.length && activation.checklist.publicLinkAvailable;
+
+  return (
+    <section className="mb-4 rounded-2xl border border-indigo-400/30 bg-indigo-500/10 p-4 space-y-3">
+      <div>
+        <p className="text-sm font-semibold">{complete ? 'Tu página está lista para compartir' : 'Activá tu página de turnos'}</p>
+        <p className="mt-1 text-[11px] text-slate-300">{completed} de 3 pasos principales completados.</p>
+      </div>
+      <div className="space-y-2">
+        {items.map((item) => {
+          const done = activation.checklist[item.key];
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => !done && onNavigate(item.tab)}
+              className="flex w-full items-center gap-2 rounded-lg border border-slate-700/70 bg-slate-950/60 px-3 py-2 text-left text-xs hover:bg-slate-900"
+            >
+              <span className={done ? 'text-emerald-400' : 'text-slate-500'}>{done ? '✓' : '○'}</span>
+              <span className={done ? 'text-slate-400 line-through' : 'text-slate-100'}>{item.label}</span>
+              {!done && <span className="ml-auto text-[11px] text-indigo-300">Configurar</span>}
+            </button>
+          );
+        })}
+      </div>
+      {activation.checklist.publicLinkAvailable && (
+        <div className="border-t border-indigo-300/20 pt-3">
+          <p className="mb-1 text-[11px] text-slate-400">Tu enlace público</p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <a href={publicUrl} target="_blank" rel="noreferrer" className="min-w-0 flex-1 break-all text-xs text-indigo-200 underline">
+              {publicUrl}
+            </a>
+            <button type="button" onClick={onCopy} className="rounded-full border border-indigo-300/40 px-3 py-1.5 text-[11px] text-indigo-100 hover:bg-indigo-400/10">
+              {copied ? 'Copiado' : 'Copiar enlace'}
+            </button>
+            <button type="button" onClick={onShare} className="rounded-full border border-indigo-300/40 px-3 py-1.5 text-[11px] text-indigo-100 hover:bg-indigo-400/10">
+              Compartir
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 

@@ -57,7 +57,7 @@ FezTime has public booking, authenticated business management, MongoDB persisten
 
 **Outcome:** A new business reaches its first published booking quickly.
 
-- P0: guided onboarding creates a usable business, service, schedule, and public slug.
+- P0: guided onboarding creates a usable business, active service, usable schedule, and public slug.
 - P1: improve first-run empty states, booking confirmation, and shareable public URL flow.
 - P1: add product analytics for activation, booking completion, and abandonment.
 
@@ -135,6 +135,8 @@ Keep tests with the behavior they verify. Do not combine billing, booking concur
 - [x] Phase 2B exposes authenticated, business-scoped payment history with bounded pagination and reduced DTOs; billing remains reachable when entitlement is inactive.
 - [x] Phase 2B allows authenticated support recovery only for a locally known payment reference, re-fetches Mercado Pago server-side, revalidates product/amount/currency/business ownership, and applies the same idempotent transition rules as the webhook.
 - [ ] Phase 2B has no focused automated tests because the repository still has no test runner; lint, typecheck, build, and diff checks remain the verification boundary.
+- [x] Phase 3 activation MVP derives a four-state onboarding checklist from server data: active service, saved working hours, minimally configured public profile, and valid public slug. Dashboard actions navigate to the existing Services, Horarios, and Ajustes tabs; the public URL is previewable, openable, and copyable without exposing secrets.
+- [ ] Phase 3 has no focused automated tests because the repository still has no test runner; lint, typecheck, build, and manual desktop/mobile activation smoke checks remain the verification boundary.
 
 ## Dependencies and Rollback
 
@@ -150,6 +152,7 @@ Dependencies flow in order: tenant/auth boundaries -> safe request contracts -> 
 | 2026-08-13 | Phase 1C | Hardened sensitive logging, bounded error taxonomy, and MP test endpoint access | Webhook, checkout, MP test, and public booking logs no longer emit bodies, provider payloads, payment URLs, tokens, phone numbers, or raw exception details; `/api/mp-test` is production-denied and session-protected outside production; public booking and webhook responses retain `error` and add stable `code`; no test runner added because the dependency-free project setup has no lightweight compatible harness |
 | 2026-08-13 | Phase 2A | Added verified, idempotent payment transitions and server-side entitlements | Webhook signature verification, unique payment provider boundary, transaction-scoped payment plus entitlement updates, serialized 30-day extensions, duplicate activation repair, safe payment audit fields, `10000` ARS unit semantics, admin/dashboard entitlement gate, billing recovery access, and explicit public booking policy implemented; no test runner exists, so lint/typecheck/build/diff-check remain required |
 | 2026-08-13 | Phase 2B | Added payment history, bounded reconciliation, and recovery UX | Authenticated business-scoped history DTOs, safe known-payment Mercado Pago refresh, shared validation/idempotency, pending/failed retry messaging, paid-through dates, and support references; no test runner exists |
+| 2026-08-13 | Phase 3 activation MVP | Added first-run activation checklist and public link sharing | `/api/admin/activation` derives state from tenant-owned services, schedules, settings, and slug; dashboard provides next actions and safe URL copy/preview; registration now transitions with a clear login confirmation; no test runner exists |
 
 ## Next Work Units
 
@@ -157,3 +160,4 @@ Dependencies flow in order: tenant/auth boundaries -> safe request contracts -> 
 - Before rolling out or relying on the `Payment.mpPaymentId` unique index, run a production duplicate cleanup: identify duplicate provider references, retain the authoritative transition/audit row, repair `Business.paidUntil` from approved periods, and only then create/validate the unique index.
 - Manual reconciliation/support procedure: authenticate as the business owner, use Billing > Historial de pagos > Verificar pago only for a listed reference, confirm the returned status and paid-through date, and escalate provider/API failures with the business ID and provider reference only. Never request or paste access tokens or raw Mercado Pago payloads.
 - Phase 1C follow-up: introduce focused unit tests only when a lightweight runner is selected and dependency policy permits it.
+- Phase 3 follow-up: manually verify a fresh registration through service, usable hours, profile, preview, and public booking on desktop and mobile; add automated coverage only after a compatible runner is selected.

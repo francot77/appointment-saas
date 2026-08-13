@@ -41,6 +41,7 @@ export default async function DashboardPage() {
   return (
     <DashboardClient
       businessName={businessName}
+      businessSlug={business.slug}
       avatarUrl={avatarUrl}
       brand={brand}
     />
