@@ -118,7 +118,8 @@ Keep tests with the behavior they verify. Do not combine billing, booking concur
 - [ ] No new dependency is installed for validation.
 - [ ] Existing lint, typecheck, and build commands pass.
 - [ ] If no test setup exists, the roadmap records that limitation and the verification commands are run.
-- [ ] Atomic booking and rate limiting are explicitly deferred to the next Phase 1 work unit.
+- [x] Public booking serializes overlap validation and creation with a MongoDB transaction-scoped per-business/day lock; cancelled and rejected appointments remain available. Requires MongoDB transactions (replica set or sharded cluster); standalone deployments fail with `503` rather than claiming atomicity.
+- [x] Public booking has a bounded per-instance baseline limiter: 5 requests per minute, with stale cleanup and `Retry-After` on `429`. Forwarding headers are ignored unless `TRUSTED_PROXY_HEADERS=true` is configured for a deployment that guarantees a trusted proxy overwrites them; otherwise all requests use a conservative shared fallback key. This must be replaced or complemented by a shared limiter before multi-instance abuse protection is treated as launch-ready.
 
 ## Dependencies and Rollback
 
@@ -130,9 +131,9 @@ Dependencies flow in order: tenant/auth boundaries -> safe request contracts -> 
 | --- | --- | --- | --- |
 | 2026-08-13 | Commercial-readiness audit | MVP baseline documented; P0 blockers identified | Prior audit: auth page 500s, non-atomic booking, weak validation, no automated tests |
 | 2026-08-13 | Phase 1A | Validation correction verified | Numeric validators reject booleans and other non-number/non-string coercions; shared `#RGB`/`#RRGGBB` color validation applies to admin service POST/PATCH; `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check` pass (lint retains 3 pre-existing warnings) |
+| 2026-08-13 | Phase 1B correction | Removed stale lease race and lock cleanup gap | Transaction-scoped unique per-business/day lock covers overlap read, insert, and token-matched release, including rejected booking returns; transient/duplicate contention is safe, unsupported standalone Mongo returns `503`; the bounded limiter ignores untrusted forwarding headers by default and documents its conservative fallback; no test setup exists, so lint/typecheck/build/diff-check are the focused verification boundary |
 
 ## Next Work Units
 
-- Phase 1B: atomic booking/idempotency and rate limiting.
 - Phase 1C: auth/API error taxonomy, sensitive logging review, and focused tests once a test harness is introduced.
 - Phase 2A: verified, idempotent billing webhooks and server-side entitlements.
