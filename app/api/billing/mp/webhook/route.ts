@@ -1,12 +1,9 @@
 import crypto from 'node:crypto';
-import { Types } from 'mongoose';
 import { NextRequest, NextResponse } from 'next/server';
 import { MercadoPagoConfig, Payment as MPPayment } from 'mercadopago';
 import dbConnect from '@/lib/db';
-import { Business } from '@/lib/models/Business';
-import { Payment } from '@/lib/models/Payments';
 import { apiError } from '@/lib/apiError';
-import { BASIC_PRICE_ARS, BASIC_PRODUCT_ID } from '@/lib/billingEntitlements';
+import { reconcileProviderPayment, isSupportedProviderStatus } from '@/lib/billingReconciliation';
 
 export const runtime = 'nodejs';
 
@@ -30,26 +27,12 @@ function verifySignature(req: NextRequest, dataId: string, secret: string) {
   return received.length === computed.length && crypto.timingSafeEqual(received, computed);
 }
 
-function isDuplicateKey(error: unknown) {
-  return typeof error === 'object' && error !== null && (error as { code?: number }).code === 11000;
-}
-
 function isTransactionUnsupported(error: unknown) {
   const code = typeof error === 'object' && error !== null
     ? (error as { code?: number }).code
     : undefined;
   const message = error instanceof Error ? error.message : '';
   return code === 20 || code === 251 || /transaction numbers are only allowed|transactions are not supported/i.test(message);
-}
-
-function normalizeStatus(status: string | undefined) {
-  if (status === 'approved') return 'approved' as const;
-  if (status === 'rejected' || status === 'cancelled') return 'rejected' as const;
-  return 'pending' as const;
-}
-
-function isSupportedStatus(status: string | undefined) {
-  return status === 'approved' || status === 'pending' || status === 'rejected' || status === 'cancelled';
 }
 
 export async function POST(req: NextRequest) {
@@ -83,84 +66,13 @@ export async function POST(req: NextRequest) {
       status_detail?: string;
       additional_info?: { items?: Array<{ id?: string; unit_price?: number; quantity?: number }> };
     };
-    if (!isSupportedStatus(payment.status)) return apiError('Estado de pago no válido', 422, 'VALIDATION');
-    const businessId = payment.external_reference;
-    const item = payment.additional_info?.items?.find((candidate) => candidate.id === BASIC_PRODUCT_ID);
-    if (!businessId || !Types.ObjectId.isValid(businessId)) return NextResponse.json({ ok: true });
-    if (payment.currency_id !== 'ARS' || payment.transaction_amount !== BASIC_PRICE_ARS ||
-        !item || item.unit_price !== BASIC_PRICE_ARS || item.quantity !== 1) {
-      return apiError('Pago no válido', 422, 'VALIDATION');
-    }
-
-    const nextStatus = normalizeStatus(payment.status);
-    const now = new Date();
-    const connection = await dbConnect();
-    const session = await connection.startSession();
+    if (!isSupportedProviderStatus(payment.status)) return apiError('Estado de pago no válido', 422, 'VALIDATION');
     try {
-      const applyPayment = () => session.withTransaction(async () => {
-        const existing = await Payment.findOne({ mpPaymentId: paymentId }).session(session).lean();
-        const business = await Business.findById(businessId)
-          .select({ _id: 1, paidUntil: 1, status: 1 })
-          .session(session)
-          .lean();
-        if (!business) return;
-
-        if (existing?.status === 'approved') {
-          await Business.updateOne(
-            { _id: business._id },
-            { $max: { paidUntil: existing.periodTo }, $set: { status: 'active' } },
-            { session }
-          );
-          return;
-        }
-        if (existing?.status === 'rejected') return;
-
-        const currentPaidUntil = business.paidUntil && business.paidUntil > now ? business.paidUntil : now;
-        const periodTo = new Date(currentPaidUntil.getTime() + 30 * 24 * 60 * 60 * 1000);
-        if (!existing) {
-          await Payment.create([{
-            businessId: business._id,
-            amount: payment.transaction_amount,
-            currency: payment.currency_id,
-            method: 'mp',
-            mpPaymentId: paymentId,
-            productId: BASIC_PRODUCT_ID,
-            providerStatus: payment.status || 'unknown',
-            status: nextStatus,
-            statusDetail: payment.status_detail || null,
-            periodFrom: now,
-            periodTo,
-          }], { session });
-        } else {
-          await Payment.updateOne(
-            { _id: existing._id, status: 'pending' },
-            { $set: { status: nextStatus, providerStatus: payment.status || 'unknown', statusDetail: payment.status_detail || null, periodTo } },
-            { session }
-          );
-        }
-
-        if (nextStatus === 'approved') {
-          await Business.updateOne(
-            { _id: business._id },
-            { $set: { paidUntil: periodTo, status: 'active' } },
-            { session }
-          );
-        } else if (nextStatus === 'rejected' && (!business.paidUntil || business.paidUntil <= now)) {
-          await Business.updateOne(
-            { _id: business._id, status: { $ne: 'cancelled' } },
-            { $set: { status: 'past_due' } },
-            { session }
-          );
-        }
-      });
-      try {
-        await applyPayment();
-      } catch (error) {
-        if (!isDuplicateKey(error)) throw error;
-        await applyPayment();
-      }
-    } finally {
-      await session.endSession();
+      await reconcileProviderPayment({ ...payment, id: paymentId });
+    } catch (error) {
+      if (error instanceof Error && error.message === 'PAYMENT_INVALID') return apiError('Pago no válido', 422, 'VALIDATION');
+      if (error instanceof Error && error.message === 'NO_BUSINESS') return NextResponse.json({ ok: true });
+      throw error;
     }
 
     return NextResponse.json({ ok: true });
