@@ -22,6 +22,7 @@ import {
   minutesToTime,
   rangesOverlap,
 } from '@/lib/time';
+import { logger } from '@/lib/logger';
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -179,8 +180,9 @@ export async function POST(req: NextRequest, props: Params) {
     if ((err as { code?: number }).code === 11000) {
       return apiError('Ese horario ya no está disponible', 409, 'CONFLICT');
     }
-    console.error('POST /api/public/[slug]/appointments failed', {
-      error: err instanceof Error ? err.name : 'unknown',
+    logger.error('booking.create.failed', {
+      route: '/api/public/[slug]/appointments',
+      errorName: err instanceof Error ? err.name : 'unknown',
     });
     return apiError('Internal error', 500, 'INTERNAL');
   }

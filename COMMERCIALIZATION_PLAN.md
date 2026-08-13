@@ -142,6 +142,10 @@ Keep tests with the behavior they verify. Do not combine billing, booking concur
 - [ ] Phase 3 has no focused automated tests because the repository still has no test runner; lint, typecheck, build, and manual desktop/mobile activation smoke checks remain the verification boundary.
 - [x] Phase 4 bounded UX slice: homepage trial CTAs link to `/register`; invalid/expired customer links exit loading with actionable recovery; Services uses inline accessible delete/error feedback; public booking shows four steps, localized date guidance, and explicit received/pending/confirmed status.
 - [ ] Phase 4 legal/trust copy remains a launch requirement where no approved source exists; no claims were invented in this slice.
+- [x] Phase 5A adds a lightweight Vitest harness for validation, slug, time/overlap, billing entitlement, and logger behavior; `npm test` is the focused command.
+- [x] Phase 5A adds `/api/health`, which returns only app/database readiness and uses `503` when the database cannot connect or is not ready.
+- [x] Phase 5A adds an allowlisted structured logger with `level`, `event`, `context`, and timestamp fields; payment and public booking failure logs exclude payloads, secrets, phone numbers, and raw exception details.
+- [ ] Phase 5A does not complete backups, restore drills, CI gates, alert ownership, incident runbooks, or production error tracking; those remain subsequent work units.
 
 ## Dependencies and Rollback
 
@@ -167,3 +171,16 @@ Dependencies flow in order: tenant/auth boundaries -> safe request contracts -> 
 - Manual reconciliation/support procedure: authenticate as the business owner, use Billing > Historial de pagos > Verificar pago only for a listed reference, confirm the returned status and paid-through date, and escalate provider/API failures with the business ID and provider reference only. Never request or paste access tokens or raw Mercado Pago payloads.
 - Phase 1C follow-up: introduce focused unit tests only when a lightweight runner is selected and dependency policy permits it.
 - Phase 3 follow-up: manually verify a fresh registration through service, usable hours, profile, preview, and public booking on desktop and mobile; add automated coverage only after a compatible runner is selected.
+- Phase 5B: expand critical route tests, add CI gates, define backup/restore evidence, and assign alert and incident-response ownership before treating operations as launch-ready.
+
+### Phase 5A Verification
+
+```bash
+npm test
+npm run lint
+npx tsc --noEmit
+npm run build
+git diff --check
+```
+
+Readiness smoke check: `GET /api/health` returns `200` with `{"status":"ok","checks":{"database":"ok"}}` when MongoDB is connected, and `503` with the same non-sensitive shape when it is unavailable.

@@ -4,6 +4,7 @@ import { MercadoPagoConfig, Payment as MPPayment } from 'mercadopago';
 import dbConnect from '@/lib/db';
 import { apiError } from '@/lib/apiError';
 import { reconcileProviderPayment, isSupportedProviderStatus } from '@/lib/billingReconciliation';
+import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
 
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest) {
     if (isTransactionUnsupported(error)) {
       return apiError('Webhook requiere MongoDB con soporte para transacciones', 503, 'INTERNAL');
     }
-    console.error('[MP WEBHOOK] failed', { error: error instanceof Error ? error.name : 'unknown' });
+    logger.error('billing.webhook.failed', { route: '/api/billing/mp/webhook', errorName: error instanceof Error ? error.name : 'unknown' });
     return apiError('WEBHOOK_ERROR', 500, 'INTERNAL');
   }
 }
