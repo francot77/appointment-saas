@@ -4,6 +4,7 @@ import dbConnect from '@/lib/db';
 import { getCurrentBusiness } from '@/lib/currentBusiness';
 import BillingClient from './BillingClient';
 import { redirect } from 'next/navigation';
+import { getEffectiveBillingStatus } from '@/lib/billingEntitlements';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,9 +28,22 @@ export default async function BillingPage(props: Props) {
 
   const paidUntil = business.paidUntil ? new Date(business.paidUntil) : null;
 
+  const statusCode = getEffectiveBillingStatus(business);
+  const statusLabel =
+    statusCode === 'active'
+      ? 'Activo'
+      : statusCode === 'trial'
+        ? 'En prueba'
+        : statusCode === 'past_due'
+          ? 'Vencido'
+          : statusCode === 'cancelled'
+            ? 'Cancelado'
+            : statusCode || 'Desconocido';
+
   const billingInfo = {
     planName: 'Básico', // después esto puede venir de la DB
-    status: business.status as string,
+    status: statusLabel,
+    statusCode,
     paidUntil: paidUntil ? paidUntil.toISOString() : null,
   };
 

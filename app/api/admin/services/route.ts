@@ -8,7 +8,7 @@ import { hexColor, nonEmptyString, nonnegativePrice, positiveInteger } from '@/l
 
 export async function GET(req: NextRequest) {
   try {
-    const business = await getCurrentBusiness();
+    const business = await getCurrentBusiness({ requireEntitlement: true });
     await dbConnect();
 
     const services = await Service.find({ businessId: business._id, active: true })
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const business = await getCurrentBusiness();
+    const business = await getCurrentBusiness({ requireEntitlement: true });
     await dbConnect();
 
     const body = await req.json().catch(() => null);
@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     if (err.message === 'UNAUTHORIZED') return apiError('Unauthorized', 401);
     if (err.message === 'NO_BUSINESS') return apiError('No business found', 403);
+    if (err.message === 'BILLING_REQUIRED') return apiError('Billing required', 402, 'FORBIDDEN');
     console.error('POST /admin/services error', err);
     return apiError('Internal error', 500);
   }

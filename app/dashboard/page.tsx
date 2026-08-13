@@ -12,9 +12,10 @@ export const dynamic = 'force-dynamic';
 export default async function DashboardPage() {
   let business;
   try {
-    business = await getCurrentBusiness();
+    business = await getCurrentBusiness({ requireEntitlement: true });
   } catch (err) {
     if (err instanceof Error && err.message === 'UNAUTHORIZED') redirect('/login');
+    if (err instanceof Error && err.message === 'BILLING_REQUIRED') redirect('/billing');
     throw err;
   }
 

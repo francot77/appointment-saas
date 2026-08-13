@@ -26,10 +26,14 @@ const PaymentSchema = new Schema(
     periodFrom: { type: Date, required: true },
     periodTo: { type: Date, required: true },
 
-    rawPayload: { type: Schema.Types.Mixed },
+    productId: { type: String, required: true },
+    providerStatus: { type: String, required: true },
+    statusDetail: { type: String, default: null },
   },
   { timestamps: true }
 );
+
+PaymentSchema.index({ mpPaymentId: 1 }, { unique: true });
 
 export const Payment =
   models.Payment || model('Payment', PaymentSchema);

@@ -35,7 +35,7 @@ export async function PATCH(req: NextRequest, props: Params) {
   const params = await props.params;
 
   try {
-    const business = await getCurrentBusiness();
+    const business = await getCurrentBusiness({ requireEntitlement: true });
     await dbConnect();
 
     const { id } = params;
@@ -213,6 +213,7 @@ export async function PATCH(req: NextRequest, props: Params) {
   } catch (err: any) {
     if (err.message === 'UNAUTHORIZED') return apiError('Unauthorized', 401);
     if (err.message === 'NO_BUSINESS') return apiError('No business', 403);
+    if (err.message === 'BILLING_REQUIRED') return apiError('Billing required', 402, 'FORBIDDEN');
     console.error('PATCH /admin/appointments/[id] error', err);
     return apiError('Internal error', 500);
   }

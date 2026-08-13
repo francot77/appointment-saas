@@ -105,7 +105,7 @@ FezTime has public booking, authenticated business management, MongoDB persisten
 3. Phase 1B: atomic booking, rate limiting, and abuse controls.
 4. Phase 1C: sensitive logging review and bounded API error taxonomy. This work unit.
 5. Phase 2A: billing state model and verified webhook transitions.
-6. Phase 2B: entitlements, checkout UX, and reconciliation.
+6. Phase 2B: billing reconciliation, subscription UX, and operational recovery.
 7. Phases 3-6: each independently reviewable by outcome, tests, acceptance evidence, and rollback.
 
 Keep tests with the behavior they verify. Do not combine billing, booking concurrency, or broad UI redesign with Phase 1A.
@@ -125,6 +125,13 @@ Keep tests with the behavior they verify. Do not combine billing, booking concur
 - [x] Phase 1C critical payment logs omit request bodies, provider payloads, payment URLs, tokens, phone numbers, and raw exception details; logs retain only safe operational identifiers and error names.
 - [x] Phase 1C `/api/mp-test` is denied in production and requires an authenticated session in development/test, so its test `initPoint` is never exposed by a production request.
 - [ ] Phase 1C has a focused test harness. No runner was added because the project has no test framework and adding one would not be lightweight or dependency-free; lint, typecheck, build, and diff checks remain the verification boundary.
+- [x] Phase 2A validates Mercado Pago `x-signature` with `MP_WEBHOOK_SECRET`, the official `id/request-id/ts` HMAC manifest, and a five-minute replay window; missing configuration fails closed.
+- [x] Phase 2A uses a unique database boundary on `Payment.mpPaymentId`, handles duplicate-key races, and stores only provider status, status detail, product, amount, currency, and billing period; raw provider payloads are not persisted.
+- [x] Phase 2A accepts only the `basic-monthly` product at `10000` ARS, validates `external_reference` as an existing business, and never trusts browser return URLs for activation.
+- [x] Phase 2A applies the entitlement gate to dashboard and `/api/admin/*` operations, while billing recovery routes and public booking remain reachable after expiration.
+- [x] Phase 2A transitions `pending` to `approved` or `rejected`, activates a 30-day period only for approved payments, exposes an effective `expired` state when `paidUntil` elapses, and ignores terminal duplicate/replayed notifications. Existing duplicate `mpPaymentId` data must be deduplicated before creating the unique index in production.
+- [x] Phase 2A wraps payment transitions and entitlement mutation in one MongoDB transaction; concurrent approved payments serialize on the business document, and approved duplicate notifications repair entitlement without extending it twice. Standalone MongoDB deployments receive `503` and require a replica set or sharded cluster.
+- [ ] Phase 2A has no focused automated tests because the repository has no compatible test runner; lint, typecheck, build, and diff checks are the verification boundary.
 
 ## Dependencies and Rollback
 
@@ -138,8 +145,9 @@ Dependencies flow in order: tenant/auth boundaries -> safe request contracts -> 
 | 2026-08-13 | Phase 1A | Validation correction verified | Numeric validators reject booleans and other non-number/non-string coercions; shared `#RGB`/`#RRGGBB` color validation applies to admin service POST/PATCH; `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check` pass (lint retains 3 pre-existing warnings) |
 | 2026-08-13 | Phase 1B correction | Removed stale lease race and lock cleanup gap | Transaction-scoped unique per-business/day lock covers overlap read, insert, and token-matched release, including rejected booking returns; transient/duplicate contention is safe, unsupported standalone Mongo returns `503`; the bounded limiter ignores untrusted forwarding headers by default and documents its conservative fallback; no test setup exists, so lint/typecheck/build/diff-check are the focused verification boundary |
 | 2026-08-13 | Phase 1C | Hardened sensitive logging, bounded error taxonomy, and MP test endpoint access | Webhook, checkout, MP test, and public booking logs no longer emit bodies, provider payloads, payment URLs, tokens, phone numbers, or raw exception details; `/api/mp-test` is production-denied and session-protected outside production; public booking and webhook responses retain `error` and add stable `code`; no test runner added because the dependency-free project setup has no lightweight compatible harness |
+| 2026-08-13 | Phase 2A | Added verified, idempotent payment transitions and server-side entitlements | Webhook signature verification, unique payment provider boundary, transaction-scoped payment plus entitlement updates, serialized 30-day extensions, duplicate activation repair, safe payment audit fields, `10000` ARS unit semantics, admin/dashboard entitlement gate, billing recovery access, and explicit public booking policy implemented; no test runner exists, so lint/typecheck/build/diff-check remain required |
 
 ## Next Work Units
 
-- Phase 2A: verified, idempotent billing webhooks and server-side entitlements.
+- Phase 2B: reconcile provider state, add payment history/support tooling, and improve billing recovery UX.
 - Phase 1C follow-up: introduce focused unit tests only when a lightweight runner is selected and dependency policy permits it.

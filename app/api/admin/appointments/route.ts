@@ -9,7 +9,7 @@ import { apiError } from '@/lib/apiError';
 
 export async function GET(req: NextRequest) {
   try {
-    const business = await getCurrentBusiness();
+    const business = await getCurrentBusiness({ requireEntitlement: true });
     await dbConnect();
 
     const { searchParams } = new URL(req.url);
@@ -69,6 +69,7 @@ export async function GET(req: NextRequest) {
   } catch (err: any) {
     if (err.message === 'UNAUTHORIZED') return apiError('Unauthorized', 401);
     if (err.message === 'NO_BUSINESS') return apiError('No business', 403);
+    if (err.message === 'BILLING_REQUIRED') return apiError('Billing required', 402, 'FORBIDDEN');
     console.error('GET /admin/appointments error', err);
     return apiError('Internal error', 500);
   }

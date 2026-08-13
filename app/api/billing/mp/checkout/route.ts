@@ -4,11 +4,9 @@ import { NextResponse } from 'next/server';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import dbConnect from '@/lib/db';
 import { getCurrentBusiness } from '@/lib/currentBusiness';
+import { BASIC_PRICE_ARS, BASIC_PRODUCT_ID } from '@/lib/billingEntitlements';
 
 export const runtime = 'nodejs';
-
-// Precio del plan básico mensual en ARS (centavos)
-const PRICE_BASIC = 100; // $10.000 ARS
 
 export async function POST() {
   try {
@@ -53,7 +51,7 @@ export async function POST() {
 
     console.log('[MP CHECKOUT] Creating preference', {
       businessId: business._id.toString(),
-      price: PRICE_BASIC,
+        price: BASIC_PRICE_ARS,
       appUrl,
       environment: isProduction ? 'production' : 'test',
     });
@@ -63,15 +61,16 @@ export async function POST() {
       body: {
         items: [
           {
-            id: 'basic-monthly',
+            id: BASIC_PRODUCT_ID,
             title: 'Suscripción mensual turnos',
             description: 'Plan básico - 1 mes',
-            unit_price: PRICE_BASIC,
+            unit_price: BASIC_PRICE_ARS,
             currency_id: 'ARS',
             quantity: 1,
           },
         ],
         external_reference: business._id.toString(),
+        metadata: { product_id: BASIC_PRODUCT_ID, plan: 'basic' },
         back_urls: backUrls,
         auto_return: 'approved',
         notification_url: `${appUrl}/api/billing/mp/webhook`,

@@ -12,7 +12,7 @@ function isValidTime(t: string) {
 
 export async function GET() {
   try {
-    const business = await getCurrentBusiness();
+    const business = await getCurrentBusiness({ requireEntitlement: true });
     await dbConnect();
 
     const docs = await ScheduleDay.find({
@@ -45,7 +45,7 @@ export async function GET() {
 
 export async function PUT(req: NextRequest) {
   try {
-    const business = await getCurrentBusiness();
+    const business = await getCurrentBusiness({ requireEntitlement: true });
     await dbConnect();
 
     const { weekday, blocks } = await req.json();
@@ -108,6 +108,7 @@ export async function PUT(req: NextRequest) {
   } catch (err: any) {
     if (err.message === 'UNAUTHORIZED') return apiError('Unauthorized', 401);
     if (err.message === 'NO_BUSINESS') return apiError('No business found', 403);
+    if (err.message === 'BILLING_REQUIRED') return apiError('Billing required', 402, 'FORBIDDEN');
     console.error('PUT /admin/schedule error', err);
     return apiError('Internal error', 500);
   }

@@ -8,6 +8,7 @@ const BusinessSchema = new Schema(
     phone: { type: String },
     address: { type: String },
     slug: { type: String, required: true, unique: true }, 
+    previousSlugs: { type: [String], default: [] },
     settings: {
       workDays: { type: [Number], default: [1, 2, 3, 4, 5, 6] },
       workHours: {
@@ -22,7 +23,7 @@ const BusinessSchema = new Schema(
     },
     status: {
       type: String,
-      enum: ['trial', 'active', 'past_due', 'cancelled'],
+      enum: ['trial', 'active', 'expired', 'past_due', 'cancelled'],
       default: 'trial',
     },
     paidUntil: {
@@ -38,5 +39,6 @@ const BusinessSchema = new Schema(
 );
 
 BusinessSchema.index({ ownerUserId: 1 });
+BusinessSchema.index({ previousSlugs: 1 });
 
 export const Business = models.Business || model('Business', BusinessSchema);

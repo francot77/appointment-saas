@@ -12,7 +12,7 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
   if (!validId.ok) return apiError(validId.error, 400);
 
   try {
-    const business = await getCurrentBusiness();
+    const business = await getCurrentBusiness({ requireEntitlement: true });
     await dbConnect();
 
     const body = await req.json().catch(() => null);
@@ -74,3 +74,4 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
     return apiError('Internal error', 500);
   }
 }
+    if (err.message === 'BILLING_REQUIRED') return apiError('Billing required', 402, 'FORBIDDEN');
