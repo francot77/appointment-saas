@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BrandConfig, DEFAULT_BRAND } from './types';
 
 type Service = {
@@ -152,16 +152,34 @@ export default function ServicesTab({ brand }: Props) {
       );
     } catch (e) {
       console.error(e);
-      alert('Error actualizando servicio');
+      setError(e instanceof Error ? e.message : 'Error actualizando servicio');
     }
   }
 
-  async function handleDelete(service: Service) {
-    const ok = window.confirm(
-      `¿Eliminar el servicio "${service.name}"? Los turnos existentes seguirán mostrando el nombre antiguo.`
-    );
-    if (!ok) return;
+  function handleDelete(service: Service, trigger: HTMLButtonElement) {
+    deleteTriggerRef.current = trigger;
+    setDeleteTarget(service);
+  }
 
+  useEffect(() => {
+    if (!deleteTarget) {
+      deleteTriggerRef.current?.focus();
+      return;
+    }
+
+    const dialog = deleteDialogRef.current;
+    if (dialog && !dialog.open) dialog.showModal();
+    deleteCancelRef.current?.focus();
+
+    return () => {
+      deleteTriggerRef.current?.focus();
+    };
+  }, [deleteTarget]);
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    const service = deleteTarget;
+    setDeleteTarget(null);
     try {
       const res = await fetch(`/api/admin/services/${service.id}`, {
         method: 'DELETE',
@@ -171,11 +189,13 @@ export default function ServicesTab({ brand }: Props) {
         throw new Error(json.error || 'Error eliminando servicio');
       }
 
-      setServices((prev) => prev.filter((s) => s.id !== service.id));
-      if (editing?.id === service.id) resetForm();
+      await loadServices();
+      if (editing?.id === service.id) {
+        resetForm();
+      }
     } catch (e) {
       console.error(e);
-      alert('Error eliminando servicio');
+      setError(e instanceof Error ? e.message : 'Error eliminando servicio');
     }
   }
 
@@ -207,10 +227,11 @@ export default function ServicesTab({ brand }: Props) {
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-400">
+              <label htmlFor="service-name" className="text-xs text-slate-400">
                 Nombre
               </label>
               <input
+                id="service-name"
                 className="bg-slate-950 border border-slate-700 rounded-md px-2 py-1 text-sm"
                 value={form.name}
                 onChange={(e) =>
@@ -221,11 +242,12 @@ export default function ServicesTab({ brand }: Props) {
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-400">
+              <label htmlFor="service-price" className="text-xs text-slate-400">
                 Precio (ARS)
               </label>
               <input
                 type="number"
+                id="service-price"
                 min={0}
                 className="bg-slate-950 border border-slate-700 rounded-md px-2 py-1 text-sm"
                 value={form.price}
@@ -237,11 +259,12 @@ export default function ServicesTab({ brand }: Props) {
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-400">
+              <label htmlFor="service-duration" className="text-xs text-slate-400">
                 Duración (minutos)
               </label>
               <input
                 type="number"
+                id="service-duration"
                 min={5}
                 step={5}
                 className="bg-slate-950 border border-slate-700 rounded-md px-2 py-1 text-sm"
@@ -257,12 +280,13 @@ export default function ServicesTab({ brand }: Props) {
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-400">
+              <label htmlFor="service-color" className="text-xs text-slate-400">
                 Color (opcional)
               </label>
               <div className="flex items-center gap-2">
                 <input
                   type="color"
+                  aria-label="Color del servicio"
                   className="h-8 w-8 rounded-md border border-slate-700 bg-slate-950"
                   value={form.color || '#3b82f6'}
                   onChange={(e) =>
@@ -270,6 +294,7 @@ export default function ServicesTab({ brand }: Props) {
                   }
                 />
                 <input
+                  id="service-color"
                   className="flex-1 bg-slate-950 border border-slate-700 rounded-md px-2 py-1 text-sm"
                   value={form.color}
                   placeholder="#38bdf8"
@@ -325,7 +350,7 @@ export default function ServicesTab({ brand }: Props) {
           </div>
 
           {error && (
-            <p className="text-[11px] text-red-400 mt-1">{error}</p>
+            <p className="text-[11px] text-red-400 mt-1" role="alert" aria-live="assertive">{error}</p>
           )}
         </form>
       </section>
@@ -337,7 +362,7 @@ export default function ServicesTab({ brand }: Props) {
             Servicios configurados
           </h3>
           {loading && (
-            <span className="text-[11px] text-slate-400">
+            <span className="text-[11px] text-slate-400" role="status" aria-live="polite">
               Cargando...
             </span>
           )}
@@ -403,7 +428,7 @@ export default function ServicesTab({ brand }: Props) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleDelete(s)}
+                  onClick={(event) => handleDelete(s, event.currentTarget)}
                   className="text-[11px] px-2.5 py-1 rounded-full border border-red-500/60 text-red-300 hover:bg-red-500/10"
                 >
                   Eliminar
@@ -413,6 +438,31 @@ export default function ServicesTab({ brand }: Props) {
           ))}
         </div>
       </section>
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-20 flex items-center justify-center bg-slate-950/80 p-4" role="presentation">
+          <dialog
+            ref={deleteDialogRef}
+            aria-labelledby="delete-service-title"
+            aria-describedby="delete-service-description"
+            onCancel={(event) => {
+              event.preventDefault();
+              setDeleteTarget(null);
+            }}
+            onClose={() => setDeleteTarget(null)}
+            className="w-full max-w-sm rounded-xl border border-slate-700 bg-slate-900 p-4 text-slate-100 shadow-2xl"
+          >
+            <h2 id="delete-service-title" className="text-sm font-semibold">Eliminar servicio</h2>
+            <p id="delete-service-description" className="mt-2 text-xs text-slate-300">
+              ¿Eliminar &quot;{deleteTarget.name}&quot;? Los turnos existentes seguirán mostrando el nombre antiguo.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button ref={deleteCancelRef} type="button" onClick={() => setDeleteTarget(null)} className="rounded-md border border-slate-600 px-3 py-1.5 text-xs">Cancelar</button>
+              <button type="button" onClick={confirmDelete} className="rounded-md border border-red-500/60 px-3 py-1.5 text-xs text-red-300">Eliminar</button>
+            </div>
+          </dialog>
+        </div>
+      )}
     </div>
   );
 }

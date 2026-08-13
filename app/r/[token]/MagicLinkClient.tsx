@@ -55,6 +55,8 @@ export default function MagicLinkClient({ token }: Props) {
   }, [token]);
 
   async function loadAppointment() {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 10000);
     setLoading(true);
     setError(null);
     setSuccessMessage(null);
@@ -62,11 +64,17 @@ export default function MagicLinkClient({ token }: Props) {
     setSelectedSlot(null);
 
     try {
-      const res = await fetch(`/api/client/appointments/${token}`);
+      const res = await fetch(`/api/client/appointments/${token}`, {
+        signal: controller.signal,
+      });
       const json = await res.json();
 
       if (!res.ok) {
-        setError(json.error || 'No se pudo cargar el turno');
+        setError(
+          res.status === 404 || res.status === 410
+            ? 'Este link ya no es válido o expiró. Pedile al negocio que te envíe un nuevo link.'
+            : json.error || 'No se pudo cargar el turno. Intentá nuevamente.'
+        );
         setAppt(null);
         return;
       }
@@ -75,9 +83,14 @@ export default function MagicLinkClient({ token }: Props) {
       setDate(json.date);
     } catch (e) {
       console.error(e);
-      setError('Error al cargar el turno');
+      setError(
+        e instanceof DOMException && e.name === 'AbortError'
+          ? 'La carga tardó demasiado. Revisá tu conexión e intentá nuevamente.'
+          : 'No se pudo cargar el turno. Intentá nuevamente.'
+      );
       setAppt(null);
     } finally {
+      window.clearTimeout(timeout);
       setLoading(false);
     }
   }
@@ -274,7 +287,18 @@ export default function MagicLinkClient({ token }: Props) {
           )}
 
           {error && (
-            <p className="text-xs text-red-400">{error}</p>
+            <div className="space-y-2" role="alert" aria-live="assertive">
+              <p className="text-xs text-red-400">{error}</p>
+              {!appt && (
+                <button
+                  type="button"
+                  onClick={loadAppointment}
+                  className="text-xs font-medium text-slate-100 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+                >
+                  Intentar nuevamente
+                </button>
+              )}
+            </div>
           )}
 
           {!loading && !appt && !error && (

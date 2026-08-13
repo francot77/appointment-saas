@@ -69,7 +69,10 @@ FezTime has public booking, authenticated business management, MongoDB persisten
 **Outcome:** The product looks deliberate and trustworthy across core journeys.
 
 - P1: align marketing promise, pricing, onboarding, dashboard, booking, and billing language.
-- P1: fix responsive, accessibility, loading, empty, error, and confirmation states.
+- P1: fix responsive, accessibility, loading, empty, error, and confirmation states on prioritized journeys.
+- P1: ensure primary trial CTAs reach registration, invalid customer links provide recovery guidance, and dashboard destructive actions use accessible feedback instead of browser dialogs.
+- P1: public booking communicates the four-step flow, localized date/availability states, and received-versus-confirmed appointment status.
+- P1: legal and trust copy remains evidence-based; placeholder claims are launch requirements unless an approved source exists.
 - P2: refine visual tokens, motion, illustrations, and tenant branding controls.
 
 **Entry:** Core behavior and conversion events are stable.
@@ -137,6 +140,8 @@ Keep tests with the behavior they verify. Do not combine billing, booking concur
 - [ ] Phase 2B has no focused automated tests because the repository still has no test runner; lint, typecheck, build, and diff checks remain the verification boundary.
 - [x] Phase 3 activation MVP derives a four-state onboarding checklist from server data: active service, saved working hours, minimally configured public profile, and valid public slug. Dashboard actions navigate to the existing Services, Horarios, and Ajustes tabs; the public URL is previewable, openable, and copyable without exposing secrets.
 - [ ] Phase 3 has no focused automated tests because the repository still has no test runner; lint, typecheck, build, and manual desktop/mobile activation smoke checks remain the verification boundary.
+- [x] Phase 4 bounded UX slice: homepage trial CTAs link to `/register`; invalid/expired customer links exit loading with actionable recovery; Services uses inline accessible delete/error feedback; public booking shows four steps, localized date guidance, and explicit received/pending/confirmed status.
+- [ ] Phase 4 legal/trust copy remains a launch requirement where no approved source exists; no claims were invented in this slice.
 
 ## Dependencies and Rollback
 
@@ -153,6 +158,7 @@ Dependencies flow in order: tenant/auth boundaries -> safe request contracts -> 
 | 2026-08-13 | Phase 2A | Added verified, idempotent payment transitions and server-side entitlements | Webhook signature verification, unique payment provider boundary, transaction-scoped payment plus entitlement updates, serialized 30-day extensions, duplicate activation repair, safe payment audit fields, `10000` ARS unit semantics, admin/dashboard entitlement gate, billing recovery access, and explicit public booking policy implemented; no test runner exists, so lint/typecheck/build/diff-check remain required |
 | 2026-08-13 | Phase 2B | Added payment history, bounded reconciliation, and recovery UX | Authenticated business-scoped history DTOs, safe known-payment Mercado Pago refresh, shared validation/idempotency, pending/failed retry messaging, paid-through dates, and support references; no test runner exists |
 | 2026-08-13 | Phase 3 activation MVP | Added first-run activation checklist and public link sharing | `/api/admin/activation` derives state from tenant-owned services, schedules, settings, and slug; dashboard provides next actions and safe URL copy/preview; registration now transitions with a clear login confirmation; no test runner exists |
+| 2026-08-13 | Phase 4 bounded visual polish | Improved conversion, invalid-link recovery, accessible dashboard feedback, and public booking clarity | Primary landing CTAs now reach `/register`; magic-link loading has timeout and actionable invalid/expired states; Services replaces browser dialogs with an inline dialog and live feedback; booking communicates four steps and localized availability guidance; no legal claims added |
 
 ## Next Work Units
 

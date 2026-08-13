@@ -231,6 +231,15 @@ export default function TurnosClient({
     return `${y}-${m}-${day}`;
   }, []);
 
+  const formattedDate = useMemo(() => {
+    if (!date) return '';
+    return new Intl.DateTimeFormat('es-AR', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+    }).format(new Date(`${date}T12:00:00`));
+  }, [date]);
+
   const businessInitial = (
     publicName && publicName.trim()
       ? publicName.trim()
@@ -287,7 +296,7 @@ export default function TurnosClient({
               {heroTitle || 'Reservar un turno'}
             </h2>
             <p className="text-xs text-slate-300">
-              Son 3 pasos: elegís servicio, fecha y horario; después completás
+               Son 4 pasos: elegís servicio, fecha y horario; después completás
               tus datos.
             </p>
           </div>
@@ -419,9 +428,12 @@ export default function TurnosClient({
                 })}
               </div>
             ) : (
-              <p className="text-xs text-slate-400">
-                Primero elegí servicio y fecha, y tocá &quot;Ver horarios
-                disponibles&quot;.
+              <p className="text-xs text-slate-400" aria-live="polite">
+                {loadingSlots
+                  ? `Buscando horarios para el ${formattedDate}.`
+                  : date
+                    ? `No hay horarios disponibles para el ${formattedDate}.`
+                  : 'Primero elegí un servicio y una fecha para ver los horarios disponibles.'}
               </p>
             )}
 
@@ -493,12 +505,12 @@ export default function TurnosClient({
           )}
 
           {error && (
-            <p className="text-xs text-red-400 pt-1 border-t border-slate-800">
+            <p className="text-xs text-red-400 pt-1 border-t border-slate-800" role="alert" aria-live="assertive">
               {error}
             </p>
           )}
           {message && !selectedSlot && (
-            <p className="text-xs text-red-400">{message}</p>
+            <p className="text-xs text-amber-300" role="status" aria-live="polite">{message}</p>
           )}
         </section>
 

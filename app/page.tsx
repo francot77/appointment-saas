@@ -28,12 +28,12 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <a
-            href="#cta"
+          <Link
+            href="/register"
             className="flex h-10 items-center justify-center rounded-full bg-indigo-600 px-4 text-xs font-bold text-white shadow-md shadow-indigo-600/30 hover:bg-indigo-500 transition-colors"
           >
             Probar Gratis
-          </a>
+          </Link>
         </header>
 
         <main className="flex-grow">
@@ -52,13 +52,13 @@ export default function LandingPage() {
                 </p>
 
                 <div className="mt-2 flex flex-col items-center gap-3 sm:flex-row sm:justify-start">
-                  <a
+                  <Link
                     id="cta"
-                    href="#pricing"
+                    href="/register"
                     className="inline-flex h-11 w-full max-w-xs items-center justify-center rounded-full bg-indigo-600 px-6 text-sm font-semibold tracking-[0.03em] text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 transition-colors"
                   >
                     Probar gratis 14 días
-                  </a>
+                  </Link>
                   <p className="text-[11px] text-slate-500">
                     Sin tarjeta. Cancelás cuando quieras.
                   </p>

@@ -1,9 +1,9 @@
 // app/[slug]/turno-recibido/page.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import dbConnect from '@/lib/db';
-import { Business } from '@/lib/models/Business';
+import { getBusinessBySlug } from '@/lib/getBusinessBySlug';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,9 +34,17 @@ export default async function TurnoRecibidoPage(props: Props) {
   const { date, time, service } = (search || {}) as any;
 
   await dbConnect();
-  const business = await Business.findOne({ slug }).lean();
+  const business = await getBusinessBySlug(slug);
 
   if (!business) notFound();
+  if ((business as any).slug && (business as any).slug !== slug) {
+    const qp = new URLSearchParams();
+    if (date) qp.set('date', String(date));
+    if (time) qp.set('time', String(time));
+    if (service) qp.set('service', String(service));
+    const suffix = qp.toString() ? `?${qp.toString()}` : '';
+    redirect(`/${(business as any).slug}/turno-recibido${suffix}`);
+  }
 
   const businessName: string = business.name || 'Tu turno';
   const primaryColor: string = business.primaryColor || '#6366F1';
@@ -44,6 +52,13 @@ export default async function TurnoRecibidoPage(props: Props) {
 
   const initial =
     businessName.trim().charAt(0).toUpperCase() || 'T';
+  const readableDate = date
+    ? new Intl.DateTimeFormat('es-AR', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+      }).format(new Date(`${date}T12:00:00`))
+    : null;
 
   return (
     <main className="min-h-screen relative bg-slate-950 text-slate-100 flex items-center justify-center px-4">
@@ -91,6 +106,10 @@ export default async function TurnoRecibidoPage(props: Props) {
             </p>
           </div>
 
+          <div role="status" aria-live="polite" className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
+            Solicitud recibida. Todavía no es una confirmación: esperá el mensaje del negocio por WhatsApp.
+          </div>
+
           {/* Resumen del turno (si viene en params) */}
           {(date || time || service) && (
             <div className="mt-2 border border-slate-800 rounded-lg p-3 bg-slate-950/80 text-xs space-y-1">
@@ -108,8 +127,8 @@ export default async function TurnoRecibidoPage(props: Props) {
               {date && (
                 <p>
                   <span className="text-slate-400">Fecha: </span>
-                  <span className="text-slate-100 font-medium">
-                    {date}
+                    <span className="text-slate-100 font-medium">
+                      {readableDate || date}
                   </span>
                 </p>
               )}
