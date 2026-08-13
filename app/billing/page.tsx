@@ -3,6 +3,7 @@
 import dbConnect from '@/lib/db';
 import { getCurrentBusiness } from '@/lib/currentBusiness';
 import BillingClient from './BillingClient';
+import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,13 @@ export default async function BillingPage(props: Props) {
   const searchParams = await props.searchParams;
   const statusParam = searchParams?.status || null;
 
-  const business: any = await getCurrentBusiness();
+  let business: any;
+  try {
+    business = await getCurrentBusiness();
+  } catch (err) {
+    if (err instanceof Error && err.message === 'UNAUTHORIZED') redirect('/login');
+    throw err;
+  }
 
   const paidUntil = business.paidUntil ? new Date(business.paidUntil) : null;
 

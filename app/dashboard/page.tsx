@@ -10,7 +10,13 @@ import { BusinessSettings } from '@/lib/models/BusinessSettings';
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
-  const business = await getCurrentBusiness();
+  let business;
+  try {
+    business = await getCurrentBusiness();
+  } catch (err) {
+    if (err instanceof Error && err.message === 'UNAUTHORIZED') redirect('/login');
+    throw err;
+  }
 
   if (!business) {
     redirect('/login');

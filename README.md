@@ -41,6 +41,10 @@ npx tsc --noEmit
 npm run build
 ```
 
+## Roadmap comercial
+
+Ver [`COMMERCIALIZATION_PLAN.md`](./COMMERCIALIZATION_PLAN.md) para el orden de fases, criterios de salida y registro de ejecución.
+
 ## Cambios de branding y UX (FezTime)
 
 - Reemplazo de nombres anteriores por “FezTime” en UI y metadatos.
