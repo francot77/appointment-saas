@@ -33,9 +33,9 @@ export async function POST(req: NextRequest, props: Params) {
   try {
     const { slug } = params;
     const validSlug = validateSlug(slug);
-    if (!validSlug.ok) return apiError(validSlug.error, 400);
+    if (!validSlug.ok) return apiError(validSlug.error, 400, 'VALIDATION');
     const body = await req.json().catch(() => null);
-    if (!body || typeof body !== 'object') return apiError('Cuerpo inválido', 400);
+    if (!body || typeof body !== 'object') return apiError('Cuerpo inválido', 400, 'VALIDATION');
     const data = body as Record<string, unknown>;
     const clientName = nonEmptyString(data.clientName, 'clientName', 120);
     const clientPhone = nonEmptyString(data.clientPhone, 'clientPhone', 40);
@@ -43,15 +43,15 @@ export async function POST(req: NextRequest, props: Params) {
     const date = validateDate(data.date);
     const startTime = validateTime(data.startTime);
     const notes = optionalString(data.notes, 'notes', 1000);
-    if (!clientName.ok) return apiError(clientName.error, 400);
-    if (!clientPhone.ok) return apiError(clientPhone.error, 400);
-    if (!serviceId.ok) return apiError(serviceId.error, 400);
-    if (!date.ok) return apiError(date.error, 400);
-    if (!startTime.ok) return apiError(startTime.error, 400);
-    if (!notes.ok) return apiError(notes.error, 400);
+    if (!clientName.ok) return apiError(clientName.error, 400, 'VALIDATION');
+    if (!clientPhone.ok) return apiError(clientPhone.error, 400, 'VALIDATION');
+    if (!serviceId.ok) return apiError(serviceId.error, 400, 'VALIDATION');
+    if (!date.ok) return apiError(date.error, 400, 'VALIDATION');
+    if (!startTime.ok) return apiError(startTime.error, 400, 'VALIDATION');
+    if (!notes.ok) return apiError(notes.error, 400, 'VALIDATION');
 
     const business = await getBusinessBySlug(validSlug.value);
-    if (!business) return apiError('Negocio no encontrado', 404);
+    if (!business) return apiError('Negocio no encontrado', 404, 'NOT_FOUND');
 
     await dbConnect();
 
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest, props: Params) {
       active: true,
     }).lean();
 
-    if (!service) return apiError('Servicio no válido', 400);
+    if (!service) return apiError('Servicio no válido', 400, 'VALIDATION');
 
     const duration = service.durationMinutes as number;
     const startMinutes = timeToMinutes(startTime.value);
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest, props: Params) {
             key: lockKey,
             token: lockToken,
           }, { session });
-          return apiError('Ese día está cerrado', 400);
+          return apiError('Ese día está cerrado', 400, 'VALIDATION');
         }
 
         const blockOk = (day.blocks as any[]).some(b => {
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest, props: Params) {
             key: lockKey,
             token: lockToken,
           }, { session });
-          return apiError('Horario fuera del rango de atención', 400);
+          return apiError('Horario fuera del rango de atención', 400, 'VALIDATION');
         }
 
         const appointments = await Appointment.find({
@@ -134,7 +134,7 @@ export async function POST(req: NextRequest, props: Params) {
             key: lockKey,
             token: lockToken,
           }, { session });
-          return apiError('Ese horario ya no está disponible', 400);
+          return apiError('Ese horario ya no está disponible', 400, 'VALIDATION');
         }
 
         const [appt] = await Appointment.create([{
@@ -158,7 +158,7 @@ export async function POST(req: NextRequest, props: Params) {
       });
     } catch (error: unknown) {
       if ((error as { code?: number }).code === 11000) {
-        return apiError('Hay otra reserva en curso para ese día. Intentá nuevamente.', 409);
+        return apiError('Hay otra reserva en curso para ese día. Intentá nuevamente.', 409, 'CONFLICT');
       }
       const mongoError = error as { code?: number; message?: string };
       if (
@@ -169,7 +169,7 @@ export async function POST(req: NextRequest, props: Params) {
         mongoError.code === 251 ||
         mongoError.message?.includes('Transaction numbers are only allowed')
       ) {
-        return apiError('La reserva no está disponible temporalmente', 503);
+        return apiError('La reserva no está disponible temporalmente', 503, 'INTERNAL');
       }
       throw error;
     } finally {
@@ -177,9 +177,11 @@ export async function POST(req: NextRequest, props: Params) {
     }
   } catch (err) {
     if ((err as { code?: number }).code === 11000) {
-      return apiError('Ese horario ya no está disponible', 409);
+      return apiError('Ese horario ya no está disponible', 409, 'CONFLICT');
     }
-    console.error('POST /api/public/[slug]/appointments error', err);
-    return apiError('Internal error', 500);
+    console.error('POST /api/public/[slug]/appointments failed', {
+      error: err instanceof Error ? err.name : 'unknown',
+    });
+    return apiError('Internal error', 500, 'INTERNAL');
   }
 }

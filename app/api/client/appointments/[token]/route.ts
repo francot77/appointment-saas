@@ -79,7 +79,9 @@ export async function GET(_req: NextRequest, props: Params) {
       { status: 200 }
     );
   } catch (err) {
-    console.error('GET /api/client/appointments/[token] error', err);
+    console.error('GET /api/client/appointments/[token] failed', {
+      error: err instanceof Error ? err.name : 'unknown',
+    });
     return apiError('Internal error', 500);
   }
 }
@@ -200,7 +202,9 @@ export async function PATCH(req: NextRequest, props: Params) {
       { status: 200 }
     );
   } catch (err) {
-    console.error('PATCH /api/client/appointments/[token] error', err);
+    console.error('PATCH /api/client/appointments/[token] failed', {
+      error: err instanceof Error ? err.name : 'unknown',
+    });
     return apiError('Internal error', 500);
   }
 }

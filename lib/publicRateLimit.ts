@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { apiError } from '@/lib/apiError';
 
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS = 5;
@@ -48,8 +49,10 @@ export function publicBookingRateLimit(req: NextRequest, scope: string) {
   if (entry.count <= MAX_REQUESTS) return null;
 
   const retryAfter = Math.max(1, Math.ceil((entry.resetAt - now) / 1000));
-  return NextResponse.json(
-    { error: 'Demasiadas solicitudes. Intentá nuevamente más tarde.' },
-    { status: 429, headers: { 'Retry-After': String(retryAfter) } }
+  return apiError(
+    'Demasiadas solicitudes. Intentá nuevamente más tarde.',
+    429,
+    'RATE_LIMITED',
+    { 'Retry-After': String(retryAfter) }
   );
 }

@@ -6,7 +6,7 @@ import { Service } from '@/lib/models/Service';
 import { ScheduleDay } from '@/lib/models/ScheduleDay';
 import { Appointment } from '@/lib/models/Appointment';
 import { apiError } from '@/lib/apiError';
-import { timeToMinutes, minutesToTime, rangesOverlap } from '@/lib/time';
+import { timeToMinutes, minutesToTime } from '@/lib/time';
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -54,31 +54,54 @@ export async function GET(req: NextRequest, props: Params) {
       businessId: business._id,
       date,
       status: { $nin: ['cancelled', 'rejected'] },
-    }).lean();
+    })
+      .select({ startTime: 1, endTime: 1 })
+      .lean();
 
-    const busyRanges = appointments.map((a: any) => ({
-      start: timeToMinutes(a.startTime),
-      end: timeToMinutes(a.endTime),
-    }));
+    const busyRangesRaw = appointments
+      .map((a: any) => ({
+        start: timeToMinutes(a.startTime),
+        end: timeToMinutes(a.endTime),
+      }))
+      .filter((r) => Number.isFinite(r.start) && Number.isFinite(r.end) && r.start < r.end)
+      .sort((a, b) => a.start - b.start);
+
+    const busyRanges: { start: number; end: number }[] = [];
+    for (const r of busyRangesRaw) {
+      const prev = busyRanges[busyRanges.length - 1];
+      if (!prev || r.start > prev.end) {
+        busyRanges.push({ start: r.start, end: r.end });
+      } else if (r.end > prev.end) {
+        prev.end = r.end;
+      }
+    }
 
     const slots: { startTime: string; endTime: string }[] = [];
 
-    for (const block of day.blocks as any[]) {
-      if (block.enabled === false) continue;
+    const blocks = (day.blocks as any[])
+      .filter((b) => b && b.enabled !== false)
+      .map((b) => ({
+        start: timeToMinutes(b.start),
+        end: timeToMinutes(b.end),
+      }))
+      .filter((b) => Number.isFinite(b.start) && Number.isFinite(b.end) && b.start < b.end)
+      .sort((a, b) => a.start - b.start);
 
-      const blockStart = timeToMinutes(block.start);
-      const blockEnd = timeToMinutes(block.end);
+    let busyIdx = 0;
 
-      for (
-        let start = blockStart;
-        start + duration <= blockEnd;
-        start += duration
-      ) {
+    for (const block of blocks) {
+      const blockStart = block.start;
+      const blockEnd = block.end;
+
+      for (let start = blockStart; start + duration <= blockEnd; start += duration) {
         const end = start + duration;
 
-        const overlaps = busyRanges.some(r =>
-          rangesOverlap(start, end, r.start, r.end)
-        );
+        while (busyIdx < busyRanges.length && busyRanges[busyIdx].end <= start) {
+          busyIdx++;
+        }
+
+        const overlaps =
+          busyIdx < busyRanges.length && busyRanges[busyIdx].start < end;
 
         if (!overlaps) {
           slots.push({
@@ -98,7 +121,9 @@ export async function GET(req: NextRequest, props: Params) {
       { status: 200 }
     );
   } catch (err) {
-    console.error('GET /api/public/[slug]/availability error', err);
+    console.error('GET /api/public/[slug]/availability failed', {
+      error: err instanceof Error ? err.name : 'unknown',
+    });
     return apiError('Internal error', 500);
   }
 }

@@ -85,7 +85,9 @@ export async function POST() {
     const initPoint = (pref as any).init_point ?? null;
 
     if (!initPoint) {
-      console.error('[MP CHECKOUT] No init_point received', pref);
+      console.error('[MP CHECKOUT] No init_point received', {
+        businessId: business._id.toString(),
+      });
       return NextResponse.json(
         { error: 'No se obtuvo init_point de Mercado Pago' },
         { status: 500 }
@@ -94,12 +96,14 @@ export async function POST() {
 
     console.log('[MP CHECKOUT] Preference created successfully', {
       preferenceId: (pref as any).id,
-      initPoint: initPoint.substring(0, 50) + '...',
+      hasInitPoint: true,
     });
 
     return NextResponse.json({ initPoint }, { status: 200 });
   } catch (err) {
-    console.error('[MP CHECKOUT] error', err);
+    console.error('[MP CHECKOUT] failed', {
+      error: err instanceof Error ? err.name : 'unknown',
+    });
     return NextResponse.json(
       { error: 'ERROR_CREATING_PREFERENCE' },
       { status: 500 }

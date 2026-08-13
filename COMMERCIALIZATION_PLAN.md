@@ -103,9 +103,10 @@ FezTime has public booking, authenticated business management, MongoDB persisten
 1. Baseline: environment, smoke scenarios, and verification contract.
 2. Phase 1A: auth redirects and shared validation foundations. This work unit.
 3. Phase 1B: atomic booking, rate limiting, and abuse controls.
-4. Phase 2A: billing state model and verified webhook transitions.
-5. Phase 2B: entitlements, checkout UX, and reconciliation.
-6. Phases 3-6: each independently reviewable by outcome, tests, acceptance evidence, and rollback.
+4. Phase 1C: sensitive logging review and bounded API error taxonomy. This work unit.
+5. Phase 2A: billing state model and verified webhook transitions.
+6. Phase 2B: entitlements, checkout UX, and reconciliation.
+7. Phases 3-6: each independently reviewable by outcome, tests, acceptance evidence, and rollback.
 
 Keep tests with the behavior they verify. Do not combine billing, booking concurrency, or broad UI redesign with Phase 1A.
 
@@ -120,6 +121,10 @@ Keep tests with the behavior they verify. Do not combine billing, booking concur
 - [ ] If no test setup exists, the roadmap records that limitation and the verification commands are run.
 - [x] Public booking serializes overlap validation and creation with a MongoDB transaction-scoped per-business/day lock; cancelled and rejected appointments remain available. Requires MongoDB transactions (replica set or sharded cluster); standalone deployments fail with `503` rather than claiming atomicity.
 - [x] Public booking has a bounded per-instance baseline limiter: 5 requests per minute, with stale cleanup and `Retry-After` on `429`. Forwarding headers are ignored unless `TRUSTED_PROXY_HEADERS=true` is configured for a deployment that guarantees a trusted proxy overwrites them; otherwise all requests use a conservative shared fallback key. This must be replaced or complemented by a shared limiter before multi-instance abuse protection is treated as launch-ready.
+- [x] Phase 1C public booking and billing webhook responses expose stable `code` values for validation, unauthorized, forbidden, not found, conflict, rate limited, and internal errors while preserving the existing `error` field; the shared helper remains opt-in so unrelated routes keep their response shape.
+- [x] Phase 1C critical payment logs omit request bodies, provider payloads, payment URLs, tokens, phone numbers, and raw exception details; logs retain only safe operational identifiers and error names.
+- [x] Phase 1C `/api/mp-test` is denied in production and requires an authenticated session in development/test, so its test `initPoint` is never exposed by a production request.
+- [ ] Phase 1C has a focused test harness. No runner was added because the project has no test framework and adding one would not be lightweight or dependency-free; lint, typecheck, build, and diff checks remain the verification boundary.
 
 ## Dependencies and Rollback
 
@@ -132,8 +137,9 @@ Dependencies flow in order: tenant/auth boundaries -> safe request contracts -> 
 | 2026-08-13 | Commercial-readiness audit | MVP baseline documented; P0 blockers identified | Prior audit: auth page 500s, non-atomic booking, weak validation, no automated tests |
 | 2026-08-13 | Phase 1A | Validation correction verified | Numeric validators reject booleans and other non-number/non-string coercions; shared `#RGB`/`#RRGGBB` color validation applies to admin service POST/PATCH; `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check` pass (lint retains 3 pre-existing warnings) |
 | 2026-08-13 | Phase 1B correction | Removed stale lease race and lock cleanup gap | Transaction-scoped unique per-business/day lock covers overlap read, insert, and token-matched release, including rejected booking returns; transient/duplicate contention is safe, unsupported standalone Mongo returns `503`; the bounded limiter ignores untrusted forwarding headers by default and documents its conservative fallback; no test setup exists, so lint/typecheck/build/diff-check are the focused verification boundary |
+| 2026-08-13 | Phase 1C | Hardened sensitive logging, bounded error taxonomy, and MP test endpoint access | Webhook, checkout, MP test, and public booking logs no longer emit bodies, provider payloads, payment URLs, tokens, phone numbers, or raw exception details; `/api/mp-test` is production-denied and session-protected outside production; public booking and webhook responses retain `error` and add stable `code`; no test runner added because the dependency-free project setup has no lightweight compatible harness |
 
 ## Next Work Units
 
-- Phase 1C: auth/API error taxonomy, sensitive logging review, and focused tests once a test harness is introduced.
 - Phase 2A: verified, idempotent billing webhooks and server-side entitlements.
+- Phase 1C follow-up: introduce focused unit tests only when a lightweight runner is selected and dependency policy permits it.

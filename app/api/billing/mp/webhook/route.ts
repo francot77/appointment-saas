@@ -5,6 +5,7 @@ import { MercadoPagoConfig, Payment as MPPayment } from 'mercadopago';
 import dbConnect from '@/lib/db';
 import { Business } from '@/lib/models/Business';
 import { Payment } from '@/lib/models/Payments'; // asegúrate que el archivo se llama así
+import { apiError } from '@/lib/apiError';
 
 export const runtime = 'nodejs';
 
@@ -22,18 +23,13 @@ export async function POST(req: NextRequest) {
         '[MP WEBHOOK] Missing access token',
         isProduction ? 'PROD' : 'TEST'
       );
-      return NextResponse.json(
-        { error: 'Sin access token' },
-        { status: 500 }
-      );
+      return apiError('Sin access token', 500, 'INTERNAL');
     }
 
     const client = new MercadoPagoConfig({ accessToken });
     const mpPayment = new MPPayment(client);
 
     const searchParams = req.nextUrl.searchParams;
-    const queryParams = Object.fromEntries(searchParams.entries());
-
     // 1) Intentamos sacar topic e id de la query
     let topic =
       searchParams.get('topic') ||
@@ -66,17 +62,17 @@ export async function POST(req: NextRequest) {
     }
 
     console.log('[MP WEBHOOK] Received notification', {
-      method: req.method,
       topic,
-      paymentId,
-      queryParams,
-      body,
+      hasPaymentId: Boolean(paymentId),
       environment: isProduction ? 'production' : 'test',
     });
 
     // Si sigue sin haber topic o id, no podemos hacer nada útil
     if (topic !== 'payment' || !paymentId) {
-      console.log('[MP WEBHOOK] Ignoring notification', { topic, paymentId });
+      console.log('[MP WEBHOOK] Ignoring notification', {
+        topic,
+        hasPaymentId: Boolean(paymentId),
+      });
       return NextResponse.json({ ok: true });
     }
 
@@ -99,7 +95,7 @@ export async function POST(req: NextRequest) {
     const existingPayment = await Payment.findOne({ mpPaymentId });
     if (existingPayment) {
       console.log('[MP WEBHOOK] Payment already processed', {
-        paymentId: mpPaymentId,
+        providerPaymentId: mpPaymentId,
         status: existingPayment.status,
         businessId: externalReference,
       });
@@ -124,7 +120,7 @@ export async function POST(req: NextRequest) {
     );
 
     console.log('[MP WEBHOOK] Processing payment', {
-      paymentId: mpPaymentId,
+      providerPaymentId: mpPaymentId,
       status,
       businessId: externalReference,
       amount,
@@ -186,10 +182,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error('[MP WEBHOOK] error', err);
-    return NextResponse.json(
-      { error: 'WEBHOOK_ERROR' },
-      { status: 500 }
-    );
+    console.error('[MP WEBHOOK] failed', {
+      error: err instanceof Error ? err.name : 'unknown',
+    });
+    return apiError('WEBHOOK_ERROR', 500, 'INTERNAL');
   }
 }

@@ -1,11 +1,22 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
+import { auth } from '@/lib/auth';
+import { apiError } from '@/lib/apiError';
 
 export const runtime = 'nodejs';
 
-export async function POST(req: NextRequest) {
+export async function POST() {
+  if (process.env.NODE_ENV === 'production') {
+    return apiError('Not allowed', 403, 'FORBIDDEN');
+  }
+
   try {
+    const session = await auth();
+    if (!session?.user) {
+      return apiError('Unauthorized', 401, 'UNAUTHORIZED');
+    }
+
     const accessToken = process.env.MP_ACCESS_TOKEN_TEST;
 
     console.log('[MP TEST] env', {
@@ -47,7 +58,9 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    console.log('[MP TEST] preference creada', pref);
+    console.log('[MP TEST] preference created', {
+      hasInitPoint: Boolean((pref as any).sandbox_init_point || (pref as any).init_point),
+    });
 
     const initPoint =
       (pref as any).sandbox_init_point ??
@@ -62,13 +75,13 @@ export async function POST(req: NextRequest) {
       { status: 200 }
     );
   } catch (err: any) {
-    console.error('[MP TEST] error', err);
+    console.error('[MP TEST] failed', {
+      error: err instanceof Error ? err.name : 'unknown',
+    });
 
     return NextResponse.json(
       {
         error: 'EXCEPTION',
-        message: err?.message ?? 'unknown',
-        name: err?.name ?? null,
       },
       { status: 500 }
     );
