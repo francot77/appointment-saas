@@ -41,10 +41,15 @@ Abrir http://localhost:3000
 ## Calidad y build
 
 ```bash
+npm test
 npm run lint
 npx tsc --noEmit
 npm run build
 ```
+
+CI runs these checks on pushes and pull requests: [`.github/workflows/ci.yml`](./.github/workflows/ci.yml).
+
+Health/readiness: `GET /api/health`. Production operations and recovery guidance: [`docs/OPERATIONS.md`](./docs/OPERATIONS.md).
 
 ## Roadmap comercial
 

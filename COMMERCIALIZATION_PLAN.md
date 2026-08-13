@@ -146,6 +146,10 @@ Keep tests with the behavior they verify. Do not combine billing, booking concur
 - [x] Phase 5A adds `/api/health`, which returns only app/database readiness and uses `503` when the database cannot connect or is not ready.
 - [x] Phase 5A adds an allowlisted structured logger with `level`, `event`, `context`, and timestamp fields; payment and public booking failure logs exclude payloads, secrets, phone numbers, and raw exception details.
 - [ ] Phase 5A does not complete backups, restore drills, CI gates, alert ownership, incident runbooks, or production error tracking; those remain subsequent work units.
+- [x] Phase 5B adds CI gates for install, tests, lint, typecheck, and build without production secrets.
+- [x] Phase 5B adds focused route tests for public booking validation, billing entitlement enforcement, and billing history tenant scoping using mocked boundaries.
+- [x] Phase 5B documents environment/secrets, MongoDB transaction topology, health checks, backup/restore responsibilities, payment duplicate cleanup, incident triage, rollback, and alert ownership placeholders.
+- [ ] Phase 5B does not provision cloud backups, alerting/error tracking, deployment changes, or CI secrets; owners must configure and evidence those controls before launch.
 
 ## Dependencies and Rollback
 
@@ -163,6 +167,7 @@ Dependencies flow in order: tenant/auth boundaries -> safe request contracts -> 
 | 2026-08-13 | Phase 2B | Added payment history, bounded reconciliation, and recovery UX | Authenticated business-scoped history DTOs, safe known-payment Mercado Pago refresh, shared validation/idempotency, pending/failed retry messaging, paid-through dates, and support references; no test runner exists |
 | 2026-08-13 | Phase 3 activation MVP | Added first-run activation checklist and public link sharing | `/api/admin/activation` derives state from tenant-owned services, schedules, settings, and slug; dashboard provides next actions and safe URL copy/preview; registration now transitions with a clear login confirmation; no test runner exists |
 | 2026-08-13 | Phase 4 bounded visual polish | Improved conversion, invalid-link recovery, accessible dashboard feedback, and public booking clarity | Primary landing CTAs now reach `/register`; magic-link loading has timeout and actionable invalid/expired states; Services replaces browser dialogs with an inline dialog and live feedback; booking communicates four steps and localized availability guidance; no legal claims added |
+| 2026-08-13 | Phase 5B CI, route tests, and operations runbook | Added repeatable quality gates, focused high-risk route coverage, and production operations guidance | `.github/workflows/ci.yml`; `tests/route-risk.test.ts`; `docs/OPERATIONS.md`; verification commands and `git diff --check` |
 
 ## Next Work Units
 
@@ -171,7 +176,7 @@ Dependencies flow in order: tenant/auth boundaries -> safe request contracts -> 
 - Manual reconciliation/support procedure: authenticate as the business owner, use Billing > Historial de pagos > Verificar pago only for a listed reference, confirm the returned status and paid-through date, and escalate provider/API failures with the business ID and provider reference only. Never request or paste access tokens or raw Mercado Pago payloads.
 - Phase 1C follow-up: introduce focused unit tests only when a lightweight runner is selected and dependency policy permits it.
 - Phase 3 follow-up: manually verify a fresh registration through service, usable hours, profile, preview, and public booking on desktop and mobile; add automated coverage only after a compatible runner is selected.
-- Phase 5B: expand critical route tests, add CI gates, define backup/restore evidence, and assign alert and incident-response ownership before treating operations as launch-ready.
+- Phase 5B follow-up: configure backup/restore evidence, alerting/error tracking, deployment probes, and named incident-response ownership before treating operations as launch-ready.
 
 ### Phase 5A Verification
 
