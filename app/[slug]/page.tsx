@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // app/[slug]/page.tsx
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import dbConnect from '@/lib/db';
-import { Business } from '@/lib/models/Business';
+import { getBusinessBySlug } from '@/lib/getBusinessBySlug';
 import { BusinessSettings } from '@/lib/models/BusinessSettings';
 import BusinessLandingClient from './BusinessLandingClient';
 
@@ -16,8 +16,9 @@ export default async function PublicBusinessHome(props: Props) {
 
   await dbConnect();
 
-  const business: any = await Business.findOne({ slug }).lean();
+  const business: any = await getBusinessBySlug(slug);
   if (!business) notFound();
+  if (business.slug && business.slug !== slug) redirect(`/${business.slug}`);
 
   const settingsDoc: any =
     (await BusinessSettings.findOne({ businessId: business._id }).lean()) ||
@@ -25,14 +26,26 @@ export default async function PublicBusinessHome(props: Props) {
 
   const uiSettings = {
     primaryColor: settingsDoc.primaryColor || '#6366F1',
-    accentColor: settingsDoc.accentColor || '#22C55E',
+    accentColor: settingsDoc.secondaryColor || '#E06B52',
     backgroundImageUrl: settingsDoc.backgroundImageUrl || null,
+    backgroundType: settingsDoc.backgroundType || 'gradient',
+    backgroundColor: settingsDoc.backgroundColor || null,
+    gradientFrom: settingsDoc.gradientFrom || null,
+    gradientTo: settingsDoc.gradientTo || null,
     logoUrl: settingsDoc.logoUrl || null,
     displayName: settingsDoc.publicName || business.name,
     tagline:
-      settingsDoc.tagline ||
+      settingsDoc.heroSubtitle ||
       business.tagline ||
       'Reservá tus turnos online',
+    heroTitle: settingsDoc.heroTitle || null,
+    ctaLabel: settingsDoc.ctaLabel || 'Reservar turno',
+    aboutTitle: settingsDoc.aboutEnabled ? settingsDoc.aboutTitle || null : null,
+    aboutText: settingsDoc.aboutEnabled ? settingsDoc.aboutText || null : null,
+    whatsappNumber: settingsDoc.whatsappNumber || null,
+    instagramHandle: settingsDoc.instagramHandle || null,
+    address: settingsDoc.address || business.address || null,
+    phone: business.phone || null,
   };
 
   return (

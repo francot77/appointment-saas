@@ -31,6 +31,22 @@ FezTime has public booking, authenticated business management, MongoDB persisten
 | P1 | Material conversion, trust, or support risk | Complete before broad launch; can follow a private pilot |
 | P2 | Scale, polish, or expansion | Post-launch unless evidence promotes it |
 
+## Visual Work Unit: Public business page
+
+**Outcome:** Turn a shared business link into a credible branded booking page instead of a link-in-bio list, while keeping tenant content and capabilities honest.
+
+**Scope:** `app/[slug]/page.tsx`, `app/[slug]/BusinessLandingClient.tsx`, and this roadmap entry only. Booking form, dashboard, schema, and slug resolution behavior remain unchanged.
+
+**Acceptance criteria:**
+
+- [x] Editorial-light mobile-first hierarchy gives the business identity, value proposition, dominant booking CTA, available contact/trust details, and a secondary share/install action distinct roles.
+- [x] Only existing settings and business fields are rendered; empty content is hidden and no reviews, metrics, addresses, or unsupported automation promises are invented.
+- [x] Tenant logo, colors, backgrounds, title, CTA, about text, WhatsApp, Instagram, address, and phone are preserved where configured, with WCAG-appropriate contrast checks and safe color fallbacks.
+- [x] Primary links, buttons, focus states, keyboard semantics, responsive layout, share cancellation/failure feedback, and install rejection/loading states are usable on mobile and desktop.
+- [x] `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check` pass; browser smoke is recorded when an available local port permits it.
+
+**Rollback boundary:** Remove only the public business page implementation in `app/[slug]/page.tsx` and `app/[slug]/BusinessLandingClient.tsx`, plus this work-unit entry. Preserve unrelated dirty-worktree changes.
+
 ## Visual Work Unit: Settings UX
 
 **Outcome:** Make business settings understandable and actionable for owners, without changing the existing settings or slug API contracts.
