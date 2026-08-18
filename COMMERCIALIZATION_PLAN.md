@@ -83,6 +83,25 @@ FezTime has public booking, authenticated business management, MongoDB persisten
 
 **Rollback boundary:** Remove only the Settings UX implementation in `app/dashboard/SettingsTab.tsx` and this roadmap entry. Preserve all unrelated dirty-worktree changes and existing API behavior.
 
+## Visual Work Unit: Billing and authentication
+
+**Outcome:** Make payment recovery, account access, and registration feel like one trustworthy FezTime product without changing payment or authentication contracts.
+
+**Scope:** `app/billing/page.tsx`, `app/billing/BillingClient.tsx`, `app/login/page.tsx`, `app/login/LoginForm.tsx`, `app/register/page.tsx`, and this roadmap entry only. Billing APIs, auth routes, dashboard, and public pages remain unchanged.
+
+**Acceptance criteria:**
+
+- [x] Billing clearly presents the real Básico plan, `$10.000 ARS/mes`, account status, paid-through date, manual-payment model, payment history, reconciliation action, and recovery guidance without inventing invoices, refunds, or automatic renewals.
+- [x] Pending, failed, expired, and retry states use actionable owner language, non-color status cues, safe support guidance, and no provider payloads or secrets.
+- [x] Login and registration share the Editorial clara header/footer, responsive hierarchy, precise `Email` labels, visible login/registration paths, accessible password visibility controls, and inline loading/error/success feedback.
+- [x] Registration explains the collected information and next onboarding step while preserving the existing `/api/register` payload and `/login?registered=1` transition.
+- [x] No browser alerts or new dependencies are introduced; focus states and mobile/desktop layouts are verified.
+- [x] `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check` pass; browser smoke is recorded when an available local port permits it.
+
+**Execution log:** Implemented after `07b2284` without modifying unrelated dirty-worktree files. Verification and browser results are recorded in the delivery response.
+
+**Rollback boundary:** Remove only the five scoped billing/auth page and client implementations plus this work-unit entry. Preserve all billing APIs, auth behavior/contracts, and unrelated dirty-worktree changes.
+
 ## Visual Work Unit: Dashboard shell and navigation
 
 **Outcome:** Make the authenticated workspace feel like a trustworthy operational product, with a clear next action and usable hierarchy across desktop and mobile.

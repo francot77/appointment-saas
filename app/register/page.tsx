@@ -3,212 +3,44 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { BRAND_NAME, BRAND_PRIMARY } from '../dashboard/types';
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [name, setName] = useState('');
-  const [businessName, setBusinessName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [address, setAddress] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [name, setName] = useState(''); const [businessName, setBusinessName] = useState(''); const [phone, setPhone] = useState(''); const [address, setAddress] = useState(''); const [email, setEmail] = useState(''); const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false); const [loading, setLoading] = useState(false); const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-
+    e.preventDefault(); setError(null); setLoading(true);
     try {
-      const res = await fetch('/api/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          businessName,
-          phone,
-          address,
-          email,
-          password,
-        }),
-      });
-
+      const res = await fetch('/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, businessName, phone, address, email, password }) });
       const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Error al registrarse');
-        setLoading(false);
-        return;
-      }
-
+      if (!res.ok) { setError(data.error || 'No pudimos crear la cuenta. Revisá los datos e intentá de nuevo.'); return; }
       router.push('/login?registered=1');
-    } catch (err) {
-      console.error(err);
-      setError('Error inesperado');
-      setLoading(false);
-    }
+    } catch { setError('No pudimos crear la cuenta ahora. Revisá tu conexión e intentá de nuevo.'); } finally { setLoading(false); }
   }
 
+  const field = 'w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20';
   return (
-    <div className="min-h-screen bg-[#101622] text-slate-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-[1.1fr,1fr] gap-6 md:gap-10 rounded-3xl border border-slate-800 bg-slate-950/80 shadow-2xl shadow-black/60 p-5 md:p-8">
-        {/* Columna izquierda: copy / contexto */}
-        <div className="flex flex-col justify-between gap-6">
-          <div className="space-y-4">
-            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-400/40 bg-indigo-500/10 px-3 py-1 text-[11px] text-indigo-200">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              <span>Configura tu agenda en menos de 5 minutos</span>
-            </div>
-
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-[-0.04em]">
-              Crear tu cuenta de FezTime
-            </h1>
-            <p className="text-sm sm:text-[15px] text-slate-400 leading-relaxed max-w-md">
-              Vamos a crear tu negocio y tu usuario para que puedas empezar a
-              cargar turnos, compartir tu link en redes y dejar el cuaderno
-              atrás.
-            </p>
-
-            <div className="mt-2 space-y-2 text-[12px] text-slate-400">
-
-            </div>
-          </div>
-
-          <p className="hidden md:block text-[11px] text-slate-500">
-            Pensado para barberías, peluquerías, manicuristas y centros de
-            estética que quieren dejar de sufrir con los turnos.
-          </p>
+    <main className="min-h-screen bg-[#f7f5f0] px-4 py-6 text-slate-900 sm:px-6 sm:py-10">
+      <div className="mx-auto w-full max-w-6xl">
+        <header className="flex items-center justify-between border-b border-slate-200 pb-5"><Link href="/" className="inline-flex items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-4"><span className="flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold text-white" style={{ backgroundColor: BRAND_PRIMARY }}>{BRAND_NAME.charAt(0).toUpperCase()}</span><span className="font-semibold tracking-tight">{BRAND_NAME}</span></Link><Link href="/login" className="text-sm font-medium text-indigo-700 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-4">Ya tengo cuenta</Link></header>
+        <div className="grid gap-10 py-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20">
+          <section className="lg:pt-8"><p className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-indigo-700">Primer paso</p><h1 className="font-serif text-4xl leading-tight tracking-[-0.04em] text-slate-950 sm:text-5xl">Empezá a ordenar tus turnos.</h1><p className="mt-6 text-lg leading-8 text-slate-600">Contanos quién sos y cómo se llama tu negocio. Después vas a poder completar servicios, horarios y la página que compartirás con tus clientes.</p><div className="mt-8 space-y-4 text-sm text-slate-700"><p><strong className="text-slate-950">Ahora:</strong> datos de contacto y acceso.</p><p><strong className="text-slate-950">Después:</strong> configurás tu agenda desde el panel.</p><p><strong className="text-slate-950">Sin tarjeta:</strong> primero creás tu cuenta y revisás el espacio.</p></div></section>
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] sm:p-8"><div className="mb-7"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-700">Crear cuenta</p><h2 className="mt-3 font-serif text-3xl tracking-[-0.03em]">Datos de tu negocio</h2><p className="mt-2 text-sm text-slate-600">Los campos con * son necesarios para empezar.</p></div>
+            <form className="space-y-5" onSubmit={handleSubmit}>
+              <div className="grid gap-5 sm:grid-cols-2"><div><label htmlFor="register-name" className="mb-2 block text-sm font-medium">Tu nombre *</label><input id="register-name" className={field} value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Ana" required autoComplete="name" /></div><div><label htmlFor="register-business" className="mb-2 block text-sm font-medium">Nombre del negocio *</label><input id="register-business" className={field} value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Ej: Barbería Centro" required /></div></div>
+              <div className="grid gap-5 sm:grid-cols-2"><div><label htmlFor="register-phone" className="mb-2 block text-sm font-medium">Teléfono de contacto *</label><input id="register-phone" className={field} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Ej: 11 2345 6789" required autoComplete="tel" /></div><div><label htmlFor="register-address" className="mb-2 block text-sm font-medium">Dirección <span className="font-normal text-slate-500">(opcional)</span></label><input id="register-address" className={field} value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Ej: Av. Siempre Viva 123" autoComplete="street-address" /></div></div>
+              <div><label htmlFor="register-email" className="mb-2 block text-sm font-medium">Email *</label><input id="register-email" type="email" className={field} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@email.com" required autoComplete="email" /></div>
+              <div><label htmlFor="register-password" className="mb-2 block text-sm font-medium">Contraseña *</label><div className="relative"><input id="register-password" type={showPassword ? 'text' : 'password'} className={`${field} pr-20`} value={password} onChange={(e) => setPassword(e.target.value)} minLength={6} placeholder="Mínimo 6 caracteres" required autoComplete="new-password" /><button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md px-2 py-1 text-xs font-medium text-indigo-700 hover:bg-indigo-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500" aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}>{showPassword ? 'Ocultar' : 'Mostrar'}</button></div><p className="mt-2 text-xs text-slate-500">La vas a usar junto con tu email para entrar al panel.</p></div>
+              {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm leading-5 text-red-800">{error}</div>}
+              <button type="submit" disabled={loading} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2">{loading && <span aria-hidden="true" className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />}{loading ? 'Creando cuenta...' : 'Crear cuenta'}</button>
+              <p className="text-center text-xs text-slate-500">No te vamos a pedir tarjeta para crear la cuenta.</p>
+            </form>
+          </section>
         </div>
-
-        {/* Columna derecha: form */}
-        <div className="rounded-2xl bg-slate-950/80 border border-slate-800 p-5 md:p-6 flex flex-col justify-center">
-          <form className="space-y-3" onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-slate-300">
-                  Tu nombre<span className="text-red-400 ml-0.5">*</span>
-                </label>
-
-                <input
-                  className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus-visible:outline-none focus-visible:border-indigo-400 focus-visible:ring-2 focus-visible:ring-indigo-500/50"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  placeholder="Ej: Ana"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-slate-300">
-                  Nombre del negocio
-                  <span className="text-red-400 ml-0.5">*</span>
-                </label>
-                <input
-                  className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus-visible:outline-none focus-visible:border-indigo-400 focus-visible:ring-2 focus-visible:ring-indigo-500/50"
-                  value={businessName}
-                  onChange={e => setBusinessName(e.target.value)}
-                  placeholder="Ej: Barbería Centro"
-                  required
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-slate-300">
-                  Teléfono de contacto
-                  <span className="text-red-400 ml-0.5">*</span>
-                </label>
-                <input
-                  className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus-visible:outline-none focus-visible:border-indigo-400 focus-visible:ring-2 focus-visible:ring-indigo-500/50"
-                  value={phone}
-                  onChange={e => setPhone(e.target.value)}
-                  placeholder="Ej: 11 2345 6789"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="block text-xs font-medium text-slate-300">
-                  Dirección (opcional)
-                </label>
-                <input
-                  className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus-visible:outline-none focus-visible:border-indigo-400 focus-visible:ring-2 focus-visible:ring-indigo-500/50"
-                  value={address}
-                  onChange={e => setAddress(e.target.value)}
-                  placeholder="Ej: Av. Siempre Viva 123"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-slate-300">
-                Email
-                <span className="text-red-400 ml-0.5">*</span>
-              </label>
-              <input
-                type="email"
-                className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus-visible:outline-none focus-visible:border-indigo-400 focus-visible:ring-2 focus-visible:ring-indigo-500/50"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="Ej: tuemail@negocio.com"
-                required
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="block text-xs font-medium text-slate-300">
-                Contraseña
-                <span className="text-red-400 ml-0.5">*</span>
-              </label>
-              <input
-                type="password"
-                className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-2 text-sm text-slate-50 placeholder:text-slate-500 focus-visible:outline-none focus-visible:border-indigo-400 focus-visible:ring-2 focus-visible:ring-indigo-500/50"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                minLength={6}
-                placeholder="Mínimo 6 caracteres"
-                required
-              />
-              <p className="text-[11px] text-slate-500">
-                Guardá este email y contraseña: los vas a usar para entrar al
-                panel.
-              </p>
-            </div>
-
-            {error && (
-              <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-200">
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full mt-2 inline-flex items-center justify-center gap-2 rounded-full px-3 py-2.5 text-sm font-semibold text-slate-50 bg-gradient-to-r from-indigo-600 to-indigo-500 shadow-lg shadow-indigo-600/25 hover:from-indigo-500 hover:to-indigo-400 transition-colors disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
-            >
-              {loading && (
-                <span className="inline-block h-3 w-3 rounded-full border border-slate-950 border-t-transparent animate-spin" />
-              )}
-              {loading ? 'Creando cuenta...' : 'Crear cuenta gratis'}
-            </button>
-
-
-            <p className="text-[11px] text-slate-500 text-center mt-1">
-              No te vamos a pedir tarjeta ahora. Podés probar y, si no te sirve, lo dejás.
-            </p>
-          </form>
-
-          <p className="text-xs text-slate-400 mt-4 text-center">
-            ¿Ya tenés cuenta?{' '}
-            <Link
-              href="/login"
-              className="text-indigo-300 hover:text-indigo-200 hover:underline"
-            >
-              Iniciar sesión
-            </Link>
-          </p>
-        </div>
+        <footer className="border-t border-slate-200 pt-5 text-center text-xs text-slate-500">FezTime · Una agenda más clara para tu negocio</footer>
       </div>
-    </div>
+    </main>
   );
 }
-
-

@@ -1,86 +1,48 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import LoginForm from './LoginForm';
-import { BRAND_NAME, BRAND_PRIMARY, BRAND_SECONDARY } from '../dashboard/types';
-
-
+import { BRAND_NAME, BRAND_PRIMARY } from '../dashboard/types';
 
 export const metadata: Metadata = {
   title: 'Iniciar sesión',
-  robots: {
-    index: false,
-    follow: false,
-  },
+  robots: { index: false, follow: false },
 };
 
-export default async function LoginPage(
-  props: {
-    searchParams?: Promise<{ from?: string; registered?: string }>;
-  }
-) {
+export default async function LoginPage(props: { searchParams?: Promise<{ from?: string; registered?: string }> }) {
   const searchParams = await props.searchParams;
   const from = searchParams?.from || '/dashboard';
   const registered = searchParams?.registered === '1';
 
   return (
-    <main className="min-h-screen relative bg-slate-950 text-slate-100 flex items-center justify-center px-4">
-      {/* Glow de fondo */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div
-          className="absolute -top-32 -left-24 w-72 h-72 rounded-full opacity-40 blur-3xl"
-          style={{ backgroundColor: BRAND_PRIMARY  }}
-        />
-        <div
-          className="absolute bottom-0 right-0 w-80 h-80 rounded-full opacity-30 blur-3xl"
-          style={{ backgroundColor: BRAND_SECONDARY }}
-        />
-      </div>
-
-      {/* Card de login */}
-      <div className="relative z-10 w-full max-w-sm bg-slate-950/80 border border-slate-800 rounded-2xl px-5 py-6 shadow-2xl shadow-black/60 backdrop-blur">
-        {/* Header pequeño */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-lg shadow-black/40"
-              style={{ backgroundColor: BRAND_PRIMARY, color: '#020617' }}
-            >
-              {BRAND_NAME.charAt(0).toUpperCase()}
-            </div>
-            <div>
-              <h1 className="text-sm font-semibold tracking-wide">
-                {BRAND_NAME}
-              </h1>
-              <p className="text-[11px] text-slate-400">
-                Panel de administración
-              </p>
-            </div>
-          </div>
-
-          <Link
-            href="/"
-            className="text-[11px] text-slate-400 hover:text-slate-200"
-          >
-            Volver al inicio
+    <main className="min-h-screen bg-[#f7f5f0] px-4 py-6 text-slate-900 sm:px-6 sm:py-10">
+      <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-6xl flex-col">
+        <header className="flex items-center justify-between border-b border-slate-200 pb-5">
+          <Link href="/" className="inline-flex items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-4">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl text-sm font-bold text-white" style={{ backgroundColor: BRAND_PRIMARY }}>{BRAND_NAME.charAt(0).toUpperCase()}</span>
+            <span className="font-semibold tracking-tight">{BRAND_NAME}</span>
           </Link>
+          <Link href="/register" className="text-sm font-medium text-indigo-700 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-4">Crear cuenta</Link>
+        </header>
+
+        <div className="grid flex-1 items-center gap-10 py-10 lg:grid-cols-[1fr_420px] lg:gap-20">
+          <section className="hidden max-w-xl lg:block">
+            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-indigo-700">Tu agenda, en orden</p>
+            <h1 className="font-serif text-5xl leading-[1.05] tracking-[-0.04em] text-slate-950">Volvé a tu negocio con claridad.</h1>
+            <p className="mt-6 max-w-md text-lg leading-8 text-slate-600">Entrá al panel para revisar tus turnos, actualizar tu página pública y mantener tu agenda disponible para tus clientes.</p>
+          </section>
+
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] sm:p-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-700">Panel de administración</p>
+            <h2 className="mt-3 font-serif text-3xl tracking-[-0.03em]">Iniciar sesión</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">Usá el email y la contraseña de tu cuenta para continuar.</p>
+
+            {registered && <p role="status" className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">Cuenta creada. Ingresá para configurar tu primera página de turnos.</p>}
+            <div className="mt-6"><LoginForm from={from} /></div>
+            <p className="mt-6 border-t border-slate-100 pt-5 text-center text-sm text-slate-600">¿Todavía no tenés cuenta? <Link href="/register" className="font-semibold text-indigo-700 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">Registrate</Link></p>
+          </section>
         </div>
 
-        <h2 className="text-lg font-semibold mb-1">Iniciar sesión</h2>
-        <p className="text-xs text-slate-400 mb-4">
-          Solo el administrador del negocio puede acceder a este panel para ver y
-          confirmar turnos.
-        </p>
-
-        {registered && (
-          <p className="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200">
-            Cuenta creada. Ingresá para configurar tu primera página de turnos.
-          </p>
-        )}
-
-        {/* Form client-side */}
-        <LoginForm from={from} />
-
-        
+        <footer className="border-t border-slate-200 pt-5 text-center text-xs text-slate-500">FezTime · Agenda simple para negocios que trabajan con turnos</footer>
       </div>
     </main>
   );
