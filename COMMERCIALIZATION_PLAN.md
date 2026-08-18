@@ -120,6 +120,25 @@ FezTime has public booking, authenticated business management, MongoDB persisten
 
 **Rollback boundary:** Remove only the appointments/calendar implementation in the four scoped dashboard files and this work-unit entry. Preserve unrelated dirty-worktree changes, API contracts, and existing WhatsApp/manual behavior.
 
+## Visual Work Unit: Schedule and working hours
+
+**Outcome:** Let a non-technical owner configure weekly working periods, pauses, and closed days quickly, with a clear preview of how availability will be generated.
+
+**Scope:** `app/dashboard/ScheduleTab.tsx`, `app/api/admin/schedule/route.ts` for schedule-boundary validation, and this roadmap entry only. Holidays, date-specific exceptions, public booking behavior, and unrelated dashboard tabs remain unchanged.
+
+**Acceptance criteria:**
+
+- [x] Editorial-light responsive schedule cards use readable 15–16px controls, clear open/closed states, touch targets, keyboard focus, and accessible labelled removal controls.
+- [x] Owner language explains working periods, breaks/lunch as separate periods, closed days, and how service duration generates availability; loading, empty, error, saved, and retry states are visible.
+- [x] UI and API reject invalid times, incomplete blocks, reversed periods, and active overlaps; disabled blocks remain persisted but do not generate availability.
+- [x] Copying a day to selected weekdays is explicit, confirms replacement when destinations already have periods, and clearly leaves copied days needing their own save action.
+- [x] No holidays or date-specific exceptions are claimed as implemented; they remain documented as future capability.
+- [x] `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check` pass; browser smoke is recorded when an available local port permits it.
+
+**Execution log:** Implemented after `ea92850` without modifying the existing dirty deletion of `app/api/admin/schedule/[weekday]/route.ts` or unrelated worktree changes. Verification and browser results are recorded in the delivery response.
+
+**Rollback boundary:** Remove only the schedule implementation in `app/dashboard/ScheduleTab.tsx`, the directly related validation changes in `app/api/admin/schedule/route.ts`, and this work-unit entry. Preserve all unrelated dirty-worktree changes and existing availability contracts.
+
 ## Execution Path
 
 ### Baseline and Stabilization

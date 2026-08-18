@@ -6,8 +6,11 @@ import { ScheduleDay } from '@/lib/models/ScheduleDay';
 import { getCurrentBusiness } from '@/lib/currentBusiness';
 import { apiError } from '@/lib/apiError';
 
-function isValidTime(t: string) {
-  return /^\d{2}:\d{2}$/.test(t);
+function timeToMinutes(t: string) {
+  if (!/^\d{2}:\d{2}$/.test(t)) return null;
+  const [hours, minutes] = t.split(':').map(Number);
+  if (hours > 23 || minutes > 59) return null;
+  return hours * 60 + minutes;
 }
 
 export async function GET() {
@@ -59,19 +62,19 @@ export async function PUT(req: NextRequest) {
       return apiError('blocks debe ser un array', 400);
     }
 
-    const normalized = blocks
-      .map((b: any) => ({
-        start: String(b.start || '').trim(),
-        end: String(b.end || '').trim(),
-        enabled: b.enabled !== false,
-      }))
-      .filter(b => b.start && b.end);
+    const normalized = blocks.map((b: any) => ({
+      start: String(b?.start || '').trim(),
+      end: String(b?.end || '').trim(),
+      enabled: b?.enabled !== false,
+    }));
 
     for (const b of normalized) {
-      if (!isValidTime(b.start) || !isValidTime(b.end)) {
+      const start = timeToMinutes(b.start);
+      const end = timeToMinutes(b.end);
+      if (start === null || end === null) {
         return apiError('Formato de hora inválido (HH:MM)', 400);
       }
-      if (b.start >= b.end) {
+      if (start >= end) {
         return apiError('La hora de inicio debe ser menor a la de fin', 400);
       }
     }
@@ -80,10 +83,11 @@ export async function PUT(req: NextRequest) {
       a.start.localeCompare(b.start)
     );
 
-    for (let i = 1; i < sorted.length; i++) {
-      const prev = sorted[i - 1];
-      const curr = sorted[i];
-      if (curr.start < prev.end) {
+    const enabledSorted = sorted.filter((block) => block.enabled);
+    for (let i = 1; i < enabledSorted.length; i++) {
+      const prev = enabledSorted[i - 1];
+      const curr = enabledSorted[i];
+      if ((timeToMinutes(curr.start) || 0) < (timeToMinutes(prev.end) || 0)) {
         return apiError('Los bloques no pueden solaparse', 400);
       }
     }
