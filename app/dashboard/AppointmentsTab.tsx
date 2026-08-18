@@ -1,991 +1,191 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect, useState } from 'react';
-import { AdminAppointment, BrandConfig, DEFAULT_BRAND } from './types';
+import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { AdminAppointment, BrandConfig, DEFAULT_BRAND } from './types';
 
-function getWeekRange(dateStr: string) {
-  const d = new Date(dateStr + 'T00:00:00');
-  const day = d.getDay(); // 0 domingo, 1 lunes, ...
-  const diffToMonday = (day + 6) % 7;
+type Slot = { startTime: string; endTime: string };
+type ViewMode = 'day' | 'week';
+type StatusFilter = 'request' | 'confirmed' | 'all';
+type PendingAction = { kind: 'reminder' | 'status'; appointment: AdminAppointment; action?: 'confirm' | 'reject' };
 
-  const monday = new Date(d);
-  monday.setDate(d.getDate() - diffToMonday);
-
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-
-  const format = (dt: Date) => dt.toISOString().slice(0, 10);
-  return { from: format(monday), to: format(sunday) };
+function dateParts(date: string) {
+  const [year, month, day] = date.split('-').map(Number);
+  return { year, month, day };
 }
 
-function getDayName(dateStr: string) {
-  const d = new Date(dateStr + 'T00:00:00');
-  const days = [
-    'Domingo',
-    'Lunes',
-    'Martes',
-    'Miércoles',
-    'Jueves',
-    'Viernes',
-    'Sábado',
-  ];
-  return days[d.getDay()];
+function localDateString(offset = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() + offset);
+  const { year, month, day } = dateParts(date.toISOString().slice(0, 10));
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function getWeekRange(dateStr: string) {
+  const date = new Date(`${dateStr}T00:00:00`);
+  const monday = new Date(date);
+  monday.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return { from: monday.toISOString().slice(0, 10), to: sunday.toISOString().slice(0, 10) };
+}
+
+function formatDate(date: string) {
+  return new Intl.DateTimeFormat('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date(`${date}T00:00:00`));
+}
+
+function formatShortDate(date: string) {
+  return new Intl.DateTimeFormat('es-AR', { day: '2-digit', month: '2-digit' }).format(new Date(`${date}T00:00:00`));
 }
 
 function statusLabel(status: AdminAppointment['status']) {
-  switch (status) {
-    case 'request':
-      return 'Pendiente';
-    case 'confirmed':
-      return 'Confirmado';
-    case 'cancelled':
-      return 'Cancelado';
-    case 'rejected':
-      return 'Rechazado';
-    default:
-      return status;
-  }
+  return { request: 'Pendiente', confirmed: 'Confirmado', cancelled: 'Cancelado', rejected: 'Rechazado' }[status];
 }
 
-function formatShortDate(dateStr: string) {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [y, m, d] = dateStr.split('-');
-  return `${d}/${m}`;
+function durationLabel(appt: AdminAppointment) {
+  if (!appt.endTime) return null;
+  const [startHour, startMinute] = appt.startTime.split(':').map(Number);
+  const [endHour, endMinute] = appt.endTime.split(':').map(Number);
+  const minutes = endHour * 60 + endMinute - (startHour * 60 + startMinute);
+  return minutes > 0 ? `${minutes} min` : null;
 }
-
-function getTodayAndTomorrowStr() {
-  const now = new Date();
-  const today = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate()
-  );
-  const tomorrow = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate() + 1
-  );
-
-  const toStr = (dt: Date) => {
-    const yyyy = dt.getFullYear();
-    const mm = String(dt.getMonth() + 1).padStart(2, '0');
-    const dd = String(dt.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
-  };
-
-  return {
-    todayStr: toStr(today),
-    tomorrowStr: toStr(tomorrow),
-  };
-}
-
-type Slot = {
-  startTime: string;
-  endTime: string;
-};
 
 export default function AppointmentsTab({ brand }: { brand?: BrandConfig }) {
   const theme = brand ?? DEFAULT_BRAND;
-
   const [date, setDate] = useState('');
-  const [viewMode, setViewMode] = useState<'day' | 'week'>('week');
-  const [statusFilter, setStatusFilter] = useState<
-    'request' | 'confirmed' | 'all'
-  >('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('week');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('request');
   const [appointments, setAppointments] = useState<AdminAppointment[]>([]);
-  const [loadingAppointments, setLoadingAppointments] = useState(false);
-  const [errorAppointments, setErrorAppointments] = useState<string | null>(
-    null
-  );
-
-  // resumen hoy/mañana
-  const [summary, setSummary] = useState<{
-    today: AdminAppointment[];
-    tomorrow: AdminAppointment[];
-  } | null>(null);
+  const [summary, setSummary] = useState<{ today: AdminAppointment[]; tomorrow: AdminAppointment[] } | null>(null);
+  const [loading, setLoading] = useState(false);
   const [loadingSummary, setLoadingSummary] = useState(false);
-  const [errorSummary, setErrorSummary] = useState<string | null>(null);
-
-  // estado para reprogramación (modal)
-  const [rescheduleAppt, setRescheduleAppt] =
-    useState<AdminAppointment | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [rescheduleAppt, setRescheduleAppt] = useState<AdminAppointment | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState('');
   const [rescheduleTime, setRescheduleTime] = useState('');
+  const [rescheduleSlots, setRescheduleSlots] = useState<Slot[]>([]);
   const [rescheduleError, setRescheduleError] = useState<string | null>(null);
+  const [rescheduleMessage, setRescheduleMessage] = useState<string | null>(null);
+  const [rescheduleLoading, setRescheduleLoading] = useState(false);
   const [rescheduleSaving, setRescheduleSaving] = useState(false);
 
-  const [rescheduleSlots, setRescheduleSlots] = useState<Slot[]>([]);
-  const [rescheduleSlotsLoading, setRescheduleSlotsLoading] = useState(false);
-  const [rescheduleSlotsMessage, setRescheduleSlotsMessage] =
-    useState<string | null>(null);
-
-  // fecha de hoy para filtros
-  useEffect(() => {
-    const now = new Date();
-    const yyyy = now.getFullYear();
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
-    const dd = String(now.getDate()).padStart(2, '0');
-    setDate(`${yyyy}-${mm}-${dd}`);
-  }, []);
-
-  // cargar turnos según filtros
-  useEffect(() => {
-    if (!date) return;
-    loadAppointments();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date, statusFilter, viewMode]);
-
-  // cargar resumen hoy / mañana una vez al montar
-  useEffect(() => {
-    loadSummary();
-  }, []);
-
-  async function handleReminder(appt: AdminAppointment) {
-    const ok = window.confirm(
-      `¿Enviar recordatorio por WhatsApp a ${appt.clientName} para el turno del ${appt.date} a las ${appt.startTime}?`
-    );
-    if (!ok) return;
-
-    try {
-      const res = await fetch(`/api/admin/appointments/${appt.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'remind' }),
-      });
-
-      const json = await res.json();
-
-      if (!res.ok) {
-        alert(json.error || 'Error enviando recordatorio');
-        return;
-      }
-
-      if (json.waUrl) {
-        window.open(json.waUrl, '_blank');
-      }
-
-      setSummary((prev) =>
-        prev
-          ? {
-              today: prev.today.map((a) =>
-                a.id === appt.id
-                  ? { ...a, reminderSent: json.reminderSent }
-                  : a
-              ),
-              tomorrow: prev.tomorrow.map((a) =>
-                a.id === appt.id
-                  ? { ...a, reminderSent: json.reminderSent }
-                  : a
-              ),
-            }
-          : prev
-      );
-    } catch (e) {
-      console.error(e);
-      alert('Error enviando recordatorio');
-    }
-  }
+  useEffect(() => setDate(localDateString()), []);
+  // The loader intentionally follows the three user-controlled filters.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (date) void loadAppointments(); }, [date, statusFilter, viewMode]);
+  useEffect(() => { void loadSummary(); }, []);
 
   async function loadAppointments() {
-    setLoadingAppointments(true);
-    setErrorAppointments(null);
-
+    setLoading(true); setError(null);
     try {
-      const params = new URLSearchParams({
-        status: statusFilter,
-      });
-
-      if (viewMode === 'day' && date) {
-        params.set('date', date);
-      } else if (viewMode === 'week' && date) {
-        const { from, to } = getWeekRange(date);
-        params.set('from', from);
-        params.set('to', to);
-      }
-
-      const res = await fetch(`/api/admin/appointments?${params.toString()}`);
-      const json = await res.json();
-
-      if (!res.ok) {
-        setErrorAppointments(json.error || 'Error cargando turnos');
-        setAppointments([]);
-      } else {
-        let appts: AdminAppointment[] = json.appointments || [];
-
-        // filtrar turnos ya pasados de HOY
-        const now = new Date();
-        const todayStr = now.toISOString().slice(0, 10);
-
-        appts = appts.filter((a) => {
-          if (a.date !== todayStr) return true;
-          const end = new Date(`${a.date}T${a.endTime}:00`);
-          return end >= now;
-        });
-
-        setAppointments(appts);
-      }
-    } catch (e) {
-      console.error(e);
-      setErrorAppointments('Error cargando turnos');
-      setAppointments([]);
-    } finally {
-      setLoadingAppointments(false);
-    }
+      const params = new URLSearchParams({ status: statusFilter });
+      if (viewMode === 'day') params.set('date', date);
+      else { const range = getWeekRange(date); params.set('from', range.from); params.set('to', range.to); }
+      const response = await fetch(`/api/admin/appointments?${params}`);
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || 'No se pudieron cargar los turnos.');
+      setAppointments((json.appointments || []).filter((appt: AdminAppointment) => {
+        if (appt.date !== localDateString()) return true;
+        return new Date(`${appt.date}T${appt.endTime}:00`) >= new Date();
+      }));
+    } catch (cause) { console.error(cause); setAppointments([]); setError(cause instanceof Error ? cause.message : 'No se pudieron cargar los turnos.'); }
+    finally { setLoading(false); }
   }
 
   async function loadSummary() {
-    setLoadingSummary(true);
-    setErrorSummary(null);
-
+    setLoadingSummary(true); setSummaryError(null);
     try {
-      const { todayStr, tomorrowStr } = getTodayAndTomorrowStr();
-
-      const [resToday, resTomorrow] = await Promise.all([
-        fetch(
-          `/api/admin/appointments?status=confirmed&date=${todayStr}`
-        ),
-        fetch(
-          `/api/admin/appointments?status=confirmed&date=${tomorrowStr}`
-        ),
+      const today = localDateString(); const tomorrow = localDateString(1);
+      const [todayResponse, tomorrowResponse] = await Promise.all([
+        fetch(`/api/admin/appointments?status=all&date=${today}`),
+        fetch(`/api/admin/appointments?status=confirmed&date=${tomorrow}`),
       ]);
-
-      const [jsonToday, jsonTomorrow] = await Promise.all([
-        resToday.json(),
-        resTomorrow.json(),
-      ]);
-
-      if (!resToday.ok) {
-        throw new Error(jsonToday.error || 'Error hoy');
-      }
-      if (!resTomorrow.ok) {
-        throw new Error(jsonTomorrow.error || 'Error mañana');
-      }
-
-      let todayAppts: AdminAppointment[] = jsonToday.appointments || [];
-      const tomorrowAppts: AdminAppointment[] =
-        jsonTomorrow.appointments || [];
-
-      const now = new Date();
-      const todayIso = now.toISOString().slice(0, 10);
-
-      todayAppts = todayAppts.filter((a) => {
-        if (a.date !== todayIso) return true;
-        const end = new Date(`${a.date}T${a.endTime}:00`);
-        return end >= now;
-      });
-
-      setSummary({
-        today: todayAppts,
-        tomorrow: tomorrowAppts,
-      });
-    } catch (e) {
-      console.error(e);
-      setErrorSummary('Error cargando resumen de hoy/mañana');
-      setSummary(null);
-    } finally {
-      setLoadingSummary(false);
-    }
+      const [todayJson, tomorrowJson] = await Promise.all([todayResponse.json(), tomorrowResponse.json()]);
+      if (!todayResponse.ok || !tomorrowResponse.ok) throw new Error('No se pudo cargar el resumen.');
+      setSummary({ today: todayJson.appointments || [], tomorrow: tomorrowJson.appointments || [] });
+    } catch (cause) { console.error(cause); setSummary(null); setSummaryError(cause instanceof Error ? cause.message : 'No se pudo cargar el resumen.'); }
+    finally { setLoadingSummary(false); }
   }
 
-  async function handleAction(
-    appt: AdminAppointment,
-    action: 'confirm' | 'reject'
-  ) {
-    const label =
-      action === 'confirm' ? 'confirmar' : 'rechazar';
-
-    const ok = window.confirm(
-      `¿Seguro que querés ${label} el turno de ${appt.clientName} el ${appt.date} a las ${appt.startTime}?`
-    );
-
-    if (!ok) return;
-
+  async function executePendingAction() {
+    if (!pendingAction) return;
+    setActionLoading(true); setFeedback(null);
+    const { appointment, kind, action } = pendingAction;
     try {
-      const res = await fetch(`/api/admin/appointments/${appt.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
+      const response = await fetch(`/api/admin/appointments/${appointment.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: kind === 'reminder' ? 'remind' : action }),
       });
-
-      const json = await res.json();
-
-      if (!res.ok) {
-        alert(json.error || 'Error actualizando el turno');
-        return;
-      }
-
-      if (json.waUrl) {
-        window.open(json.waUrl, '_blank');
-      }
-
-      setAppointments((prev) =>
-        prev.map((a) =>
-          a.id === appt.id ? { ...a, status: json.status } : a
-        )
-      );
-
-      loadSummary();
-    } catch (e) {
-      console.error(e);
-      alert('Error actualizando el turno');
-    }
-  }
-
-  // abrir modal de reprogramación
-  function openRescheduleModal(appt: AdminAppointment) {
-    setRescheduleAppt(appt);
-    setRescheduleDate(appt.date);
-    setRescheduleTime(appt.startTime);
-    setRescheduleError(null);
-    setRescheduleSlots([]);
-    setRescheduleSlotsMessage(null);
-  }
-
-  function closeRescheduleModal() {
-    setRescheduleAppt(null);
-    setRescheduleDate('');
-    setRescheduleTime('');
-    setRescheduleError(null);
-    setRescheduleSaving(false);
-    setRescheduleSlots([]);
-    setRescheduleSlotsMessage(null);
-    setRescheduleSlotsLoading(false);
-  }
-
-  async function loadRescheduleSlots() {
-    if (!rescheduleAppt) return;
-
-    if (!rescheduleDate) {
-      setRescheduleError('Elegí la nueva fecha para ver horarios disponibles');
-      return;
-    }
-
-    setRescheduleError(null);
-    setRescheduleSlots([]);
-    setRescheduleSlotsMessage(null);
-    setRescheduleSlotsLoading(true);
-
-    try {
-      const params = new URLSearchParams({
-        date: rescheduleDate,
-        serviceId: (rescheduleAppt as any).serviceId,
-      });
-
-      const res = await fetch(
-        `/api/admin/availability?${params.toString()}`
-      );
-      const json = await res.json();
-
-      if (!res.ok) {
-        setRescheduleError(json.error || 'Error obteniendo horarios');
-        setRescheduleSlots([]);
+      const json = await response.json();
+      if (!response.ok) throw new Error(json.error || 'No se pudo actualizar el turno.');
+      if (json.waUrl) window.open(json.waUrl, '_blank', 'noopener,noreferrer');
+      if (kind === 'status') {
+        setAppointments((current) => current.map((item) => item.id === appointment.id ? { ...item, status: json.status } : item));
+        setFeedback(json.status === 'confirmed' ? (json.waUrl ? 'Turno confirmado. Se abrió WhatsApp para continuar la comunicación.' : 'Turno confirmado. No hay un enlace telefónico utilizable para abrir WhatsApp.') : 'Solicitud rechazada.');
       } else {
-        const slots: Slot[] = json.slots || [];
-        setRescheduleSlots(slots);
-        if (slots.length === 0) {
-          setRescheduleSlotsMessage(
-            'No hay horarios disponibles para esa fecha.'
-          );
-        }
+        setFeedback(json.waUrl ? 'WhatsApp se abrió para enviar el recordatorio manual.' : 'El recordatorio fue registrado, pero no hay un enlace telefónico utilizable para abrir WhatsApp.');
+        setSummary((current) => current ? { today: current.today.map((item) => item.id === appointment.id ? { ...item, reminderSent: json.reminderSent } : item), tomorrow: current.tomorrow } : current);
       }
-    } catch (err) {
-      console.error(err);
-      setRescheduleError('Error obteniendo horarios');
-      setRescheduleSlots([]);
-    } finally {
-      setRescheduleSlotsLoading(false);
-    }
+      setPendingAction(null); void loadSummary();
+    } catch (cause) { console.error(cause); setFeedback(cause instanceof Error ? cause.message : 'No se pudo completar la acción.'); }
+    finally { setActionLoading(false); }
   }
 
-  async function handleRescheduleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!rescheduleAppt) return;
+  function openReschedule(appt: AdminAppointment) { setRescheduleAppt(appt); setRescheduleDate(appt.date); setRescheduleTime(appt.startTime); setRescheduleSlots([]); setRescheduleError(null); setRescheduleMessage(null); }
+  function closeReschedule() { setRescheduleAppt(null); setRescheduleDate(''); setRescheduleTime(''); setRescheduleSlots([]); setRescheduleError(null); setRescheduleMessage(null); }
 
-    setRescheduleError(null);
-
-    if (!rescheduleDate || !rescheduleTime) {
-      setRescheduleError('Elegí la nueva fecha y horario');
-      return;
-    }
-
-    setRescheduleSaving(true);
-
+  async function loadSlots() {
+    if (!rescheduleAppt || !rescheduleDate) { setRescheduleError('Elegí una fecha para ver horarios disponibles.'); return; }
+    setRescheduleLoading(true); setRescheduleError(null); setRescheduleMessage(null);
     try {
-      const res = await fetch(
-        `/api/admin/appointments/${rescheduleAppt.id}`,
-        {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'reschedule',
-            newDate: rescheduleDate,
-            newStartTime: rescheduleTime,
-          }),
-        }
-      );
-
-      const json = await res.json();
-
-      if (!res.ok) {
-        setRescheduleError(json.error || 'Error reprogramando el turno');
-        setRescheduleSaving(false);
-        return;
-      }
-
-      // abrir WhatsApp si corresponde
-      if (json.waUrl) {
-        window.open(json.waUrl, '_blank');
-      }
-
-      // actualizar lista principal
-      setAppointments((prev) =>
-        prev.map((a) =>
-          a.id === rescheduleAppt.id
-            ? {
-                ...a,
-                date: json.date,
-                startTime: json.startTime,
-                endTime: json.endTime,
-              }
-            : a
-        )
-      );
-
-      // actualizar resumen hoy/mañana
-      setSummary((prev) =>
-        prev
-          ? {
-              today: prev.today.map((a) =>
-                a.id === rescheduleAppt.id
-                  ? {
-                      ...a,
-                      date: json.date,
-                      startTime: json.startTime,
-                      endTime: json.endTime,
-                    }
-                  : a
-              ),
-              tomorrow: prev.tomorrow.map((a) =>
-                a.id === rescheduleAppt.id
-                  ? {
-                      ...a,
-                      date: json.date,
-                      startTime: json.startTime,
-                      endTime: json.endTime,
-                    }
-                  : a
-              ),
-            }
-          : prev
-      );
-
-      closeRescheduleModal();
-    } catch (err) {
-      console.error(err);
-      setRescheduleError('Error reprogramando el turno');
-      setRescheduleSaving(false);
-    }
+      const response = await fetch(`/api/admin/availability?date=${rescheduleDate}&serviceId=${rescheduleAppt.serviceId}`);
+      const json = await response.json(); if (!response.ok) throw new Error(json.error || 'No se pudieron cargar los horarios.');
+      const slots: Slot[] = json.slots || []; setRescheduleSlots(slots); if (!slots.length) setRescheduleMessage('No hay horarios disponibles para esa fecha.');
+    } catch (cause) { console.error(cause); setRescheduleError(cause instanceof Error ? cause.message : 'No se pudieron cargar los horarios.'); }
+    finally { setRescheduleLoading(false); }
   }
 
-  let weekLabel = '';
-  if (viewMode === 'week' && date) {
-    const { from, to } = getWeekRange(date);
-    weekLabel = `Semana del ${from} al ${to}`;
+  async function submitReschedule(event: FormEvent) {
+    event.preventDefault(); if (!rescheduleAppt || !rescheduleDate || !rescheduleTime) { setRescheduleError('Elegí la nueva fecha y horario.'); return; }
+    setRescheduleSaving(true); setRescheduleError(null);
+    try {
+      const response = await fetch(`/api/admin/appointments/${rescheduleAppt.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'reschedule', newDate: rescheduleDate, newStartTime: rescheduleTime }) });
+      const json = await response.json(); if (!response.ok) throw new Error(json.error || 'No se pudo reprogramar el turno.');
+      if (json.waUrl) window.open(json.waUrl, '_blank', 'noopener,noreferrer');
+      setAppointments((current) => current.map((item) => item.id === rescheduleAppt.id ? { ...item, date: json.date, startTime: json.startTime, endTime: json.endTime } : item));
+      closeReschedule(); setFeedback(json.waUrl ? 'Turno reprogramado. WhatsApp se abrió para comunicar el cambio manualmente.' : 'Turno reprogramado. El cambio fue registrado, pero no hay un enlace telefónico utilizable para abrir WhatsApp.'); void loadSummary();
+    } catch (cause) { console.error(cause); setRescheduleError(cause instanceof Error ? cause.message : 'No se pudo reprogramar el turno.'); }
+    finally { setRescheduleSaving(false); }
   }
 
-  return (
-    <>
-      {/* RESUMEN HOY / MAÑANA */}
-      <section className="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Resumen rápido</h2>
-          <button
-            onClick={loadSummary}
-            className="text-[11px] px-2 py-1 rounded-full border border-slate-700 hover:bg-slate-800"
-          >
-            Actualizar
-          </button>
-        </div>
+  const weekLabel = date && viewMode === 'week' ? (() => { const range = getWeekRange(date); return `${formatShortDate(range.from)} al ${formatShortDate(range.to)}`; })() : null;
+  const requestCount = summary?.today.filter((appt) => appt.status === 'request').length ?? 0;
 
-        {loadingSummary && (
-          <p className="text-xs text-slate-400">Cargando...</p>
-        )}
-        {errorSummary && (
-          <p className="text-xs text-red-400">{errorSummary}</p>
-        )}
-
-        {summary && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* HOY */}
-            <div className="bg-slate-950 border border-slate-800 rounded-lg p-2 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold">
-                  Hoy (
-                  {summary.today[0]
-                    ? formatShortDate(summary.today[0].date)
-                    : formatShortDate(getTodayAndTomorrowStr().todayStr)}
-                  )
-                </span>
-                <span className="text-[11px] text-slate-400">
-                  {summary.today.length} turno
-                  {summary.today.length !== 1 ? 's' : ''}
-                </span>
-              </div>
-              {summary.today.length === 0 ? (
-                <p className="text-[11px] text-slate-500">
-                  No hay turnos confirmados hoy.
-                </p>
-              ) : (
-                <ul className="space-y-1">
-                  {summary.today.map((a) => (
-                    <li
-                      key={a.id}
-                      className="text-[11px] text-slate-200 flex items-center gap-2"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span>
-                            <span
-                              className="font-semibold"
-                              style={{ color: theme.primary }}
-                            >
-                              {a.startTime}
-                            </span>{' '}
-                            · {a.clientName}
-                          </span>
-                        </div>
-
-                        <span className="block text-slate-400 truncate max-w-[160px]">
-                          {a.serviceName}
-                        </span>
-                      </div>
-
-                      {!a.reminderSent ? (
-                        <button
-                          onClick={() => handleReminder(a)}
-                          className="text-[10px] px-2 py-1 rounded-full border text-slate-50 hover:opacity-90 whitespace-nowrap"
-                          style={{
-                            borderColor: theme.primary,
-                            color: theme.primary,
-                          }}
-                        >
-                          Recordatorio
-                        </button>
-                      ) : (
-                        <button onClick={() => handleReminder(a)}>
-                          <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/40">
-                            Recordatorio enviado
-                          </span>
-                        </button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            {/* MAÑANA */}
-            <div className="bg-slate-950 border border-slate-800 rounded-lg p-2 space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold">
-                  Mañana (
-                  {summary.tomorrow[0]
-                    ? formatShortDate(summary.tomorrow[0].date)
-                    : formatShortDate(getTodayAndTomorrowStr().tomorrowStr)}
-                  )
-                </span>
-                <span className="text-[11px] text-slate-400">
-                  {summary.tomorrow.length} turno
-                  {summary.tomorrow.length !== 1 ? 's' : ''}
-                </span>
-              </div>
-              {summary.tomorrow.length === 0 ? (
-                <p className="text-[11px] text-slate-500">
-                  No hay turnos confirmados mañana.
-                </p>
-              ) : (
-                <ul className="space-y-1">
-                  {summary.tomorrow.map((a) => (
-                    <li
-                      key={a.id}
-                      className="text-[11px] text-slate-200 flex items-center gap-2"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span>
-                            <span
-                              className="font-semibold"
-                              style={{ color: theme.primary }}
-                            >
-                              {a.startTime}
-                            </span>{' '}
-                            · {a.clientName}
-                          </span>
-                        </div>
-
-                        <span className="block text-slate-400 truncate max-w-[160px]">
-                          {a.serviceName}
-                        </span>
-                      </div>
-
-                      {!a.reminderSent ? (
-                        <button
-                          onClick={() => handleReminder(a)}
-                          className="text-[10px] px-2 py-1 rounded-full border text-slate-50 hover:opacity-90 whitespace-nowrap"
-                          style={{
-                            borderColor: theme.primary,
-                            color: theme.primary,
-                          }}
-                        >
-                          Recordatorio
-                        </button>
-                      ) : (
-                        <button onClick={() => handleReminder(a)}>
-                          <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/40">
-                            Recordatorio enviado
-                          </span>
-                        </button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* FILTROS PRINCIPALES */}
-      <section className="bg-slate-900 border border-slate-800 rounded-xl my-2 p-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-slate-400">Fecha base</label>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="bg-slate-950 border border-slate-700 text-sm rounded-md px-2 py-1"
-          />
-          <span className="text-[10px] text-slate-500">
-            En modo semana se usa para calcular la semana.
-          </span>
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-slate-400">Vista</span>
-          <div className="inline-flex rounded-md border border-slate-700 overflow-hidden w-fit">
-            <button
-              onClick={() => setViewMode('day')}
-              className={`px-3 py-1 text-xs ${
-                viewMode === 'day'
-                  ? 'bg-slate-100 text-slate-900'
-                  : 'bg-slate-900 text-slate-300'
-              }`}
-            >
-              Día
-            </button>
-            <button
-              onClick={() => setViewMode('week')}
-              className={`px-3 py-1 text-xs ${
-                viewMode === 'week'
-                  ? 'bg-slate-100 text-slate-900'
-                  : 'bg-slate-900 text-slate-300'
-              }`}
-            >
-              Semana
-            </button>
-          </div>
-          {viewMode === 'week' && weekLabel && (
-            <p className="text-[10px] text-slate-500">{weekLabel}</p>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-slate-400">Estado</span>
-          <div className="inline-flex rounded-md border border-slate-700 overflow-hidden w-fit">
-            <button
-              onClick={() => setStatusFilter('request')}
-              className={`px-3 py-1 text-xs ${
-                statusFilter === 'request'
-                  ? 'bg-slate-100 text-slate-900'
-                  : 'bg-slate-900 text-slate-300'
-              }`}
-            >
-              Pendientes
-            </button>
-            <button
-              onClick={() => setStatusFilter('confirmed')}
-              className={`px-3 py-1 text-xs ${
-                statusFilter === 'confirmed'
-                  ? 'bg-slate-100 text-slate-900'
-                  : 'bg-slate-900 text-slate-300'
-              }`}
-            >
-              Confirmados
-            </button>
-            <button
-              onClick={() => setStatusFilter('all')}
-              className={`px-3 py-1 text-xs ${
-                statusFilter === 'all'
-                  ? 'bg-slate-100 text-slate-900'
-                  : 'bg-slate-900 text-slate-300'
-              }`}
-            >
-              Todos
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* LISTA DE TURNOS */}
-      <section className="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold">Turnos</h2>
-          {loadingAppointments && (
-            <span className="text-xs text-slate-400">
-              Cargando...
-            </span>
-          )}
-        </div>
-
-        {errorAppointments && (
-          <p className="text-xs text-red-400">{errorAppointments}</p>
-        )}
-
-        {!loadingAppointments &&
-          appointments.length === 0 &&
-          !errorAppointments && (
-            <p className="text-xs text-slate-400">
-              No hay turnos para esta combinación de filtros.
-            </p>
-          )}
-
-        <div className="space-y-2">
-          {appointments.map((a) => (
-            <div
-              key={a.id}
-              className="border-l-4 bg-slate-950 rounded-lg px-3 py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
-              style={{ borderLeftColor: a.serviceColor || theme.primary }}
-            >
-              <div className="flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[11px] text-slate-400">
-                    {a.date} · {getDayName(a.date)}
-                  </span>
-                  <span
-                    className="text-sm font-semibold"
-                    style={{ color: theme.primary }}
-                  >
-                    {a.startTime}
-                  </span>
-                  <span className="text-sm font-medium">
-                    {a.clientName}
-                  </span>
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded-full ${
-                      a.status === 'request'
-                        ? 'bg-amber-500/20 text-amber-300'
-                        : a.status === 'confirmed'
-                        ? 'bg-emerald-500/20 text-emerald-300'
-                        : 'bg-red-700/50 text-slate-200'
-                    }`}
-                  >
-                    {statusLabel(a.status)}
-                  </span>
-                </div>
-                <div className="text-xs text-slate-400 mt-1">
-                  <span>{a.serviceName}</span>
-                  {a.clientPhone && (
-                    <>
-                      {' '}
-                      · <span>{a.clientPhone}</span>
-                    </>
-                  )}
-                </div>
-                {a.notes && (
-                  <p className="text-xs text-slate-300 mt-1">
-                    {a.notes}
-                  </p>
-                )}
-                <div className="mt-1 flex flex-wrap gap-2">
-                  <Link
-                    href={`/dashboard/appointments/${a.id}`}
-                    className="text-[11px] text-slate-400 hover:text-slate-200 underline underline-offset-2"
-                  >
-                    Ver detalle
-                  </Link>
-
-                  {(a.status === 'request' || a.status === 'confirmed') && (
-                    <button
-                      type="button"
-                      onClick={() => openRescheduleModal(a)}
-                      className="text-[11px] px-2 py-0.5 rounded-full border border-slate-600 text-slate-200 hover:bg-slate-800"
-                    >
-                      Reprogramar
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {a.status === 'request' && (
-                <div className="flex flex-row gap-2 justify-end">
-                  <button
-                    onClick={() => handleAction(a, 'confirm')}
-                    className="text-xs px-3 py-1 rounded-md shadow-sm"
-                    style={{
-                      backgroundColor: theme.primary,
-                      color: theme.textOnPrimary,
-                      boxShadow: `0 0 10px ${theme.primary}40`,
-                    }}
-                  >
-                    Confirmar
-                  </button>
-
-                  <button
-                    onClick={() => handleAction(a, 'reject')}
-                    className="text-xs px-3 py-1 rounded-md border border-slate-600 text-slate-100 hover:bg-slate-800"
-                  >
-                    Rechazar
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* MODAL REPROGRAMAR */}
-      {rescheduleAppt && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 w-full max-w-sm space-y-3">
-            <h3 className="text-sm font-semibold">
-              Reprogramar turno
-            </h3>
-            <p className="text-[11px] text-slate-300">
-              {rescheduleAppt.clientName} · {rescheduleAppt.serviceName}
-              <br />
-              Actual: {rescheduleAppt.date} · {rescheduleAppt.startTime}
-            </p>
-
-            <form onSubmit={handleRescheduleSubmit} className="space-y-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-400">
-                  Nueva fecha
-                </label>
-                <input
-                  type="date"
-                  value={rescheduleDate}
-                  onChange={(e) => {
-                    setRescheduleDate(e.target.value);
-                    setRescheduleSlots([]);
-                    setRescheduleSlotsMessage(null);
-                  }}
-                  className="bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-sm"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-400">
-                  Horarios disponibles
-                </label>
-                <button
-                  type="button"
-                  onClick={loadRescheduleSlots}
-                  disabled={rescheduleSlotsLoading || !rescheduleDate}
-                  className="text-[11px] px-3 py-1 rounded-full border border-slate-700 hover:bg-slate-800 disabled:opacity-60 w-fit"
-                >
-                  {rescheduleSlotsLoading
-                    ? 'Buscando horarios...'
-                    : 'Ver horarios disponibles'}
-                </button>
-
-                {rescheduleSlotsLoading && (
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Cargando horarios...
-                  </p>
-                )}
-
-                {!rescheduleSlotsLoading &&
-                  rescheduleSlots.length > 0 && (
-                    <div className="grid grid-cols-3 gap-2 text-xs mt-2">
-                      {rescheduleSlots.map((slot) => {
-                        const isSelected =
-                          rescheduleTime === slot.startTime;
-                        return (
-                          <button
-                            key={slot.startTime}
-                            type="button"
-                            onClick={() =>
-                              setRescheduleTime(slot.startTime)
-                            }
-                            className="rounded-full py-1.5 border text-center"
-                            style={
-                              isSelected
-                                ? {
-                                    borderColor: theme.primary,
-                                    backgroundColor: theme.primary,
-                                    color: theme.textOnPrimary,
-                                  }
-                                : {}
-                            }
-                          >
-                            {slot.startTime}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                {rescheduleSlotsMessage && (
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    {rescheduleSlotsMessage}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-400">
-                  Nuevo horario (opcional, se completa al elegir un slot)
-                </label>
-                <input
-                  type="time"
-                  value={rescheduleTime}
-                  onChange={(e) => setRescheduleTime(e.target.value)}
-                  className="bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-sm"
-                />
-              </div>
-
-              {rescheduleError && (
-                <p className="text-[11px] text-red-400">
-                  {rescheduleError}
-                </p>
-              )}
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={closeRescheduleModal}
-                  className="text-xs px-3 py-1 rounded-md border border-slate-600 text-slate-200 hover:bg-slate-800"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={rescheduleSaving}
-                  className="text-xs px-3 py-1 rounded-md shadow-sm"
-                  style={{
-                    backgroundColor: theme.primary,
-                    color: theme.textOnPrimary,
-                    opacity: rescheduleSaving ? 0.6 : 1,
-                    boxShadow: `0 0 10px ${theme.primary}40`,
-                  }}
-                >
-                  {rescheduleSaving ? 'Guardando...' : 'Guardar cambio'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </>
-  );
+  return <div className="space-y-6 text-slate-900">
+    <section className="rounded-2xl border border-indigo-100 bg-white p-5 shadow-[0_12px_35px_rgba(79,70,229,0.07)] sm:p-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-indigo-700">Prioridad de hoy</p><h2 className="mt-2 text-xl font-semibold tracking-[-0.02em]">{requestCount ? `${requestCount} solicitud${requestCount === 1 ? '' : 'es'} necesita${requestCount === 1 ? '' : 'n'} tu respuesta` : 'Tus próximos turnos, en orden'}</h2><p className="mt-1 text-sm text-slate-500">Revisá las solicitudes antes de atender tu agenda confirmada.</p></div><button type="button" onClick={() => void loadSummary()} className="min-h-11 rounded-full border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:border-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">Actualizar</button></div>
+      {summaryError && <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800" role="alert">{summaryError} <button type="button" className="ml-2 font-semibold underline" onClick={() => void loadSummary()}>Reintentar</button></p>}
+      {loadingSummary && <p className="mt-4 text-sm text-slate-500" role="status">Cargando agenda de hoy y mañana...</p>}
+      {summary && <div className="mt-5 grid gap-4 md:grid-cols-2"><SummaryDay label="Hoy" date={summary.today[0]?.date || localDateString()} appointments={summary.today} theme={theme} onReminder={(appt) => setPendingAction({ kind: 'reminder', appointment: appt })} /><SummaryDay label="Mañana" date={summary.tomorrow[0]?.date || localDateString(1)} appointments={summary.tomorrow} theme={theme} onReminder={(appt) => setPendingAction({ kind: 'reminder', appointment: appt })} /></div>}
+    </section>
+    {feedback && <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">{feedback}</p>}
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">Agenda</p><h2 className="mt-1 text-xl font-semibold tracking-[-0.02em]">Turnos para gestionar</h2></div><div className="grid gap-4 sm:grid-cols-3"><label className="text-sm font-semibold text-slate-700">Fecha<input type="date" value={date} onChange={(event) => setDate(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200" /></label><fieldset><legend className="text-sm font-semibold text-slate-700">Mostrar</legend><div className="mt-1 flex rounded-xl border border-slate-300 p-1"><Toggle active={viewMode === 'day'} onClick={() => setViewMode('day')}>Día</Toggle><Toggle active={viewMode === 'week'} onClick={() => setViewMode('week')}>Semana</Toggle></div></fieldset><fieldset><legend className="text-sm font-semibold text-slate-700">Estado</legend><div className="mt-1 flex rounded-xl border border-slate-300 p-1"><Toggle active={statusFilter === 'request'} onClick={() => setStatusFilter('request')}>Pendientes</Toggle><Toggle active={statusFilter === 'confirmed'} onClick={() => setStatusFilter('confirmed')}>Confirmados</Toggle><Toggle active={statusFilter === 'all'} onClick={() => setStatusFilter('all')}>Todos</Toggle></div></fieldset></div></div>{weekLabel && <p className="mt-4 text-sm text-slate-500">Semana del {weekLabel}</p>}
+      {loading && <p className="mt-5 text-sm text-slate-500" role="status">Cargando turnos...</p>}{error && <p className="mt-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">{error} <button type="button" className="ml-2 font-semibold underline" onClick={() => void loadAppointments()}>Reintentar</button></p>}{!loading && !error && !appointments.length && <div className="mt-5 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center"><p className="text-base font-semibold text-slate-800">No hay turnos en esta vista</p><p className="mt-1 text-sm text-slate-500">Probá otro estado, fecha o vista para revisar la agenda.</p></div>}
+      <div className="mt-5 space-y-3">{appointments.map((appt) => <AppointmentCard key={appt.id} appointment={appt} theme={theme} onAction={(action) => setPendingAction({ kind: 'status', appointment: appt, action })} onReschedule={() => openReschedule(appt)} />)}</div>
+    </section>
+    {pendingAction && <ConfirmationDialog pending={pendingAction} loading={actionLoading} onCancel={() => setPendingAction(null)} onConfirm={() => void executePendingAction()} />}
+    {rescheduleAppt && <RescheduleDialog appointment={rescheduleAppt} date={rescheduleDate} time={rescheduleTime} slots={rescheduleSlots} error={rescheduleError} message={rescheduleMessage} loading={rescheduleLoading} saving={rescheduleSaving} theme={theme} onClose={closeReschedule} onSubmit={submitReschedule} onDateChange={(value) => { setRescheduleDate(value); setRescheduleSlots([]); setRescheduleMessage(null); }} onTimeChange={setRescheduleTime} onLoadSlots={() => void loadSlots()} />}
+  </div>;
 }
+
+function Toggle({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) { return <button type="button" aria-pressed={active} onClick={onClick} className={`min-h-10 rounded-lg px-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${active ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}>{children}</button>; }
+
+function SummaryDay({ label, date, appointments, theme, onReminder }: { label: string; date: string; appointments: AdminAppointment[]; theme: BrandConfig; onReminder: (appointment: AdminAppointment) => void }) { return <div className="rounded-xl border border-slate-200 bg-slate-50 p-4"><div className="flex items-baseline justify-between gap-3"><div><h3 className="text-base font-semibold text-slate-900">{label}</h3><p className="text-sm capitalize text-slate-500">{formatDate(date)}</p></div><span className="text-sm font-semibold text-slate-500">{appointments.length} {appointments.length === 1 ? 'turno' : 'turnos'}</span></div>{!appointments.length ? <p className="mt-4 text-sm text-slate-500">No hay turnos para este día.</p> : <ul className="mt-4 space-y-3">{appointments.map((appt) => <li key={appt.id} className="flex items-center justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-900"><span style={{ color: theme.primary }}>{appt.startTime}</span> · {appt.clientName}</p><p className="truncate text-sm text-slate-500">{appt.serviceName} <span className="sr-only">Estado: </span><span className="font-medium text-slate-700">({statusLabel(appt.status)})</span></p></div>{appt.status === 'confirmed' && <button type="button" onClick={() => onReminder(appt)} className="min-h-10 shrink-0 rounded-full border px-3 text-sm font-semibold hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500" style={{ borderColor: theme.primary, color: theme.primary }}>{appt.reminderSent ? 'Reenviar WhatsApp' : 'Recordar por WhatsApp'}</button>}</li>)}</ul>}</div>; }
+
+function AppointmentCard({ appointment: appt, theme, onAction, onReschedule }: { appointment: AdminAppointment; theme: BrandConfig; onAction: (action: 'confirm' | 'reject') => void; onReschedule: () => void }) { return <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" style={{ borderLeftWidth: 4, borderLeftColor: appt.serviceColor || theme.primary }}><div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-x-3 gap-y-1"><p className="text-sm font-medium capitalize text-slate-500">{formatDate(appt.date)}</p><p className="text-lg font-semibold" style={{ color: theme.primary }}>{appt.startTime}{appt.endTime ? ` - ${appt.endTime}` : ''}</p><span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700"><span className="sr-only">Estado: </span>{statusLabel(appt.status)}</span></div><h3 className="mt-3 text-lg font-semibold text-slate-950">{appt.clientName}</h3><p className="mt-1 text-sm text-slate-600">{appt.serviceName}{durationLabel(appt) ? ` · ${durationLabel(appt)}` : ''}{appt.clientPhone ? ` · ${appt.clientPhone}` : ''}</p>{appt.notes && <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">{appt.notes}</p>}<div className="mt-4 flex flex-wrap gap-3"><Link href={`/dashboard/appointments/${appt.id}`} className="inline-flex min-h-11 items-center rounded-full border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:border-indigo-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">Ver detalle</Link>{(appt.status === 'request' || appt.status === 'confirmed') && <button type="button" onClick={onReschedule} className="min-h-11 rounded-full border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:border-indigo-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">Reprogramar</button>}</div></div>{appt.status === 'request' && <div className="flex w-full gap-2 lg:w-auto"><button type="button" onClick={() => onAction('confirm')} className="min-h-11 flex-1 rounded-full px-4 text-sm font-semibold shadow-sm hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 lg:flex-none" style={{ backgroundColor: theme.primary, color: theme.textOnPrimary }}>Confirmar</button><button type="button" onClick={() => onAction('reject')} className="min-h-11 flex-1 rounded-full border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 lg:flex-none">Rechazar</button></div>}</div></article>; }
+
+function ConfirmationDialog({ pending, loading, onCancel, onConfirm }: { pending: PendingAction; loading: boolean; onCancel: () => void; onConfirm: () => void }) { const isReminder = pending.kind === 'reminder'; const actionText = pending.action === 'confirm' ? 'confirmar' : 'rechazar'; return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="presentation"><div role="dialog" aria-modal="true" aria-labelledby="appointment-confirm-title" className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"><h2 id="appointment-confirm-title" className="text-lg font-semibold text-slate-950">{isReminder ? 'Enviar recordatorio por WhatsApp' : `¿Querés ${actionText} este turno?`}</h2><p className="mt-2 text-sm text-slate-600">{isReminder ? `Se abrirá WhatsApp para que envíes manualmente el recordatorio a ${pending.appointment.clientName}.` : `${pending.appointment.clientName} · ${formatDate(pending.appointment.date)} a las ${pending.appointment.startTime}.`}</p><div className="mt-6 flex justify-end gap-3"><button type="button" onClick={onCancel} className="min-h-11 rounded-full border border-slate-300 px-4 text-sm font-semibold text-slate-700">Cancelar</button><button type="button" autoFocus onClick={onConfirm} disabled={loading} className="min-h-11 rounded-full bg-slate-900 px-4 text-sm font-semibold text-white disabled:opacity-60">{loading ? 'Procesando...' : isReminder ? 'Abrir WhatsApp' : `Sí, ${actionText}`}</button></div></div></div>; }
+
+function RescheduleDialog({ appointment, date, time, slots, error, message, loading, saving, theme, onClose, onSubmit, onDateChange, onTimeChange, onLoadSlots }: { appointment: AdminAppointment; date: string; time: string; slots: Slot[]; error: string | null; message: string | null; loading: boolean; saving: boolean; theme: BrandConfig; onClose: () => void; onSubmit: (event: FormEvent) => void; onDateChange: (value: string) => void; onTimeChange: (value: string) => void; onLoadSlots: () => void }) { return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4"><div role="dialog" aria-modal="true" aria-labelledby="reschedule-title" className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><h2 id="reschedule-title" className="text-lg font-semibold text-slate-950">Reprogramar turno</h2><p className="mt-1 text-sm text-slate-500">{appointment.clientName} · {appointment.serviceName}</p></div><button type="button" onClick={onClose} aria-label="Cerrar reprogramación" className="min-h-11 min-w-11 rounded-full text-xl text-slate-500 hover:bg-slate-100">×</button></div><form onSubmit={onSubmit} className="mt-6 space-y-4"><label className="block text-sm font-semibold text-slate-700">Nueva fecha<input type="date" value={date} onChange={(event) => onDateChange(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 px-3 font-normal" /></label><div><p className="text-sm font-semibold text-slate-700">Horarios disponibles</p><button type="button" onClick={onLoadSlots} disabled={loading || !date} className="mt-2 min-h-11 rounded-full border border-slate-300 px-4 text-sm font-semibold text-slate-700 disabled:opacity-50">{loading ? 'Buscando horarios...' : 'Ver horarios disponibles'}</button>{slots.length > 0 && <div className="mt-3 grid grid-cols-3 gap-2">{slots.map((slot) => <button type="button" key={slot.startTime} onClick={() => onTimeChange(slot.startTime)} aria-pressed={time === slot.startTime} className="min-h-11 rounded-xl border text-sm font-semibold" style={time === slot.startTime ? { backgroundColor: theme.primary, borderColor: theme.primary, color: theme.textOnPrimary } : undefined}>{slot.startTime}</button>)}</div>}{message && <p className="mt-2 text-sm text-slate-500">{message}</p>}</div><label className="block text-sm font-semibold text-slate-700">Horario<input type="time" value={time} onChange={(event) => onTimeChange(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 px-3 font-normal" /></label>{error && <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700" role="alert">{error}</p>}<div className="flex justify-end gap-3"><button type="button" onClick={onClose} className="min-h-11 rounded-full border border-slate-300 px-4 text-sm font-semibold text-slate-700">Cancelar</button><button type="submit" disabled={saving} className="min-h-11 rounded-full px-4 text-sm font-semibold disabled:opacity-60" style={{ backgroundColor: theme.primary, color: theme.textOnPrimary }}>{saving ? 'Guardando...' : 'Guardar cambio'}</button></div></form></div></div>; }

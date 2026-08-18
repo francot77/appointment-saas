@@ -99,6 +99,27 @@ FezTime has public booking, authenticated business management, MongoDB persisten
 
 **Rollback boundary:** Remove only the dashboard shell/navigation implementation in `app/dashboard/DashboardClient.tsx` and this work-unit entry. Preserve unrelated dirty-worktree changes.
 
+## Visual Work Unit: Appointments and calendar operations
+
+**Outcome:** Help business owners see what needs attention today, understand the upcoming agenda, and update appointments confidently from desktop or mobile.
+
+**Scope:** `app/dashboard/AppointmentsTab.tsx`, `app/dashboard/CalendarTab.tsx`, `app/dashboard/appointments/[id]/AppointmentDetailClient.tsx`, `app/dashboard/appointments/[id]/page.tsx` (route wiring only), and this roadmap entry only. Existing appointment APIs, WhatsApp/manual communication behavior, and unrelated dashboard tabs remain unchanged.
+
+**Acceptance criteria:**
+
+- [x] Editorial-light appointment and calendar surfaces match the dashboard shell, use tenant accents, and keep readable text and touch targets.
+- [x] Pending requests are the first operational signal; today/tomorrow counts are derived from real appointment responses and do not claim analytics.
+- [x] Date, day/week, and status controls are grouped with plain labels while preserving existing query parameters and endpoint contracts.
+- [x] Browser `alert`/`confirm` usage is removed from the scoped surfaces; sensitive actions use accessible inline confirmation and feedback states.
+- [x] Cards and details show client, service, date/time, duration when available, explicit status text, clear actions, and loading/error/empty/retry states.
+- [x] Calendar appointments are keyboard-operable real buttons with accessible labels, a useful empty state, and responsive layout; the calendar remains the existing lightweight weekly view.
+- [x] Communication copy accurately describes manual WhatsApp flows and does not claim automated reminders.
+- [x] `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check` pass; browser smoke is recorded when an available local port permits it.
+
+**Execution log:** Implemented as the next visual work unit after `dac9ac3`, without modifying unrelated dirty-worktree files. Verification and browser results are recorded in the delivery response.
+
+**Rollback boundary:** Remove only the appointments/calendar implementation in the four scoped dashboard files and this work-unit entry. Preserve unrelated dirty-worktree changes, API contracts, and existing WhatsApp/manual behavior.
+
 ## Execution Path
 
 ### Baseline and Stabilization

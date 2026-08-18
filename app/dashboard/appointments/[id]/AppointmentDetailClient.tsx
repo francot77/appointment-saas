@@ -2,365 +2,39 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { AdminAppointment, BrandConfig, DEFAULT_BRAND } from '../../types';
 
-import { PINK, AdminAppointment } from '../../types';
+type AppointmentDetail = AdminAppointment;
+type Action = 'confirm' | 'reject' | 'cancel';
 
-type AppointmentDetail = AdminAppointment & {
-  createdAt?: string;
-  updatedAt?: string;
-  reminderSentAt?: string | null;
-};
+function statusLabel(status: AppointmentDetail['status']) { return { request: 'Pendiente', confirmed: 'Confirmado', cancelled: 'Cancelado', rejected: 'Rechazado' }[status]; }
+function actionLabel(action: Action) { return { confirm: 'confirmar', reject: 'rechazar', cancel: 'cancelar' }[action]; }
+function duration(appt: AppointmentDetail) { if (!appt.endTime) return null; const start = appt.startTime.split(':').map(Number); const end = appt.endTime.split(':').map(Number); const minutes = end[0] * 60 + end[1] - (start[0] * 60 + start[1]); return minutes > 0 ? `${minutes} minutos` : null; }
 
-type Props = {
-  id: string;
-};
-
-function statusLabelEs(status: AppointmentDetail['status']) {
-  switch (status) {
-    case 'request':
-      return 'Pendiente';
-    case 'confirmed':
-      return 'Confirmado';
-    case 'cancelled':
-      return 'Cancelado';
-    case 'rejected':
-      return 'Rechazado';
-    default:
-      return status;
-  }
-}
-
-function statusBadgeClasses(status: AppointmentDetail['status']) {
-  switch (status) {
-    case 'request':
-      return 'bg-amber-500/20 text-amber-300 border border-amber-400/50';
-    case 'confirmed':
-      return 'bg-emerald-500/15 text-emerald-300 border border-emerald-400/60';
-    case 'cancelled':
-      return 'bg-slate-600/30 text-slate-200 border border-slate-500/70';
-    case 'rejected':
-      return 'bg-red-500/20 text-red-300 border border-red-500/60';
-    default:
-      return 'bg-slate-700/40 text-slate-200 border border-slate-600';
-  }
-}
-
-export default function AppointmentDetailClient({ id }: Props) {
+export default function AppointmentDetailClient({ id }: { id: string }) {
   const router = useRouter();
+  const theme: BrandConfig = DEFAULT_BRAND;
   const [appointment, setAppointment] = useState<AppointmentDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState<
-    'confirm' | 'reject' | 'cancel' | 'remind' | null
-  >(null);
+  const [actionLoading, setActionLoading] = useState<Action | 'remind' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<Action | null>(null);
 
-  useEffect(() => {
-    let mounted = true;
+  useEffect(() => { let active = true; async function load() { setLoading(true); setError(null); try { const response = await fetch(`/api/admin/appointments/${id}`); const json = await response.json(); if (!response.ok) throw new Error(json.error || 'No se pudo cargar el turno.'); if (active) setAppointment(json.appointment); } catch (cause) { console.error(cause); if (active) { setAppointment(null); setError(cause instanceof Error ? cause.message : 'No se pudo cargar el turno.'); } } finally { if (active) setLoading(false); } } void load(); return () => { active = false; }; }, [id]);
 
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await fetch(`/api/admin/appointments/${id}`);
-        const json = await res.json();
-        if (!res.ok) {
-          if (mounted) {
-            setError(json.error || 'Error cargando el turno');
-            setAppointment(null);
-          }
-        } else {
-          if (mounted) setAppointment(json.appointment);
-        }
-      } catch (e) {
-        console.error(e);
-        if (mounted) {
-          setError('Error cargando el turno');
-          setAppointment(null);
-        }
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    }
-
-    load();
-    return () => {
-      mounted = false;
-    };
-  }, [id]);
-
-  async function handleAction(action: 'confirm' | 'reject' | 'cancel') {
-    if (!appointment) return;
-    setActionLoading(action);
-    setError(null);
-    try {
-      const res = await fetch(`/api/admin/appointments/${appointment.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action }),
-      });
-      const json = await res.json();
-
-      if (!res.ok) {
-        setError(json.error || 'No se pudo actualizar el turno');
-        return;
-      }
-
-      // si la API devuelve waUrl cuando se confirma / rechaza, abrimos pestaña
-      if (json.waUrl) {
-        window.open(json.waUrl, '_blank');
-      }
-
-      setAppointment((prev: AppointmentDetail | null) =>
-        prev ? { ...prev, status: json.status || actionMapToStatus(action) } : prev
-      );
-    } catch (e) {
-      console.error(e);
-      setError('No se pudo actualizar el turno');
-    } finally {
-      setActionLoading(null);
-    }
+  async function handleAction(action: Action) {
+    if (!appointment) return; setActionLoading(action); setError(null);
+    try { const response = await fetch(`/api/admin/appointments/${appointment.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) }); const json = await response.json(); if (!response.ok) throw new Error(json.error || 'No se pudo actualizar el turno.'); if (json.waUrl) window.open(json.waUrl, '_blank', 'noopener,noreferrer'); setAppointment((current) => current ? { ...current, status: json.status || ({ confirm: 'confirmed', reject: 'rejected', cancel: 'cancelled' }[action]) } : current); setFeedback(json.waUrl ? 'Estado actualizado. WhatsApp se abrió para continuar la comunicación manualmente.' : 'Estado actualizado.'); } catch (cause) { console.error(cause); setError(cause instanceof Error ? cause.message : 'No se pudo actualizar el turno.'); } finally { setActionLoading(null); }
   }
 
-  function actionMapToStatus(action: 'confirm' | 'reject' | 'cancel') {
-    switch (action) {
-      case 'confirm':
-        return 'confirmed';
-      case 'reject':
-        return 'rejected';
-      case 'cancel':
-        return 'cancelled';
-    }
-  }
+  async function handleReminder() { if (!appointment) return; setActionLoading('remind'); setError(null); try { const response = await fetch(`/api/admin/appointments/${appointment.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'remind' }) }); const json = await response.json(); if (!response.ok) throw new Error(json.error || 'No se pudo generar el recordatorio.'); if (json.waUrl) window.open(json.waUrl, '_blank', 'noopener,noreferrer'); setAppointment((current) => current ? { ...current, reminderSent: json.reminderSent } : current); setFeedback(json.waUrl ? 'WhatsApp se abrió para enviar el recordatorio manual.' : 'El recordatorio fue registrado, pero no hay un enlace telefónico utilizable para abrir WhatsApp.'); } catch (cause) { console.error(cause); setError(cause instanceof Error ? cause.message : 'No se pudo generar el recordatorio.'); } finally { setActionLoading(null); } }
 
-  async function handleRemind() {
-    if (!appointment) return;
-    setActionLoading('remind');
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/admin/appointments/${appointment.id}/remind`,
-        { method: 'POST' }
-      );
-      const json = await res.json();
-      if (!res.ok) {
-        setError(json.error || 'No se pudo generar el recordatorio');
-        return;
-      }
+  if (loading) return <main className="min-h-screen bg-[#f4f1ec] p-6 text-slate-900"><p className="text-sm text-slate-500" role="status">Cargando turno...</p></main>;
+  if (!appointment) return <main className="min-h-screen bg-[#f4f1ec] p-6 text-slate-900"><div className="mx-auto max-w-3xl"><button type="button" onClick={() => router.back()} className="min-h-11 rounded-full px-3 text-sm font-semibold text-slate-600 hover:bg-white">Volver al panel</button><p className="mt-6 text-base font-semibold text-rose-700">No se encontró la información del turno.</p><p className="mt-1 text-sm text-slate-600" role="alert">{error}</p></div></main>;
 
-      if (json.waUrl) {
-        window.open(json.waUrl, '_blank');
-      }
-
-      if (json.reminderSentAt && appointment) {
-        setAppointment((prev: AppointmentDetail | null) =>
-          prev ? { ...prev, reminderSentAt: json.reminderSentAt } : prev
-        );
-      }
-    } catch (e) {
-      console.error(e);
-      setError('No se pudo generar el recordatorio');
-    } finally {
-      setActionLoading(null);
-    }
-  }
-
-  if (loading) {
-    return (
-      <main className="min-h-screen bg-slate-950 text-slate-100 flex justify-center p-4">
-        <div className="w-full max-w-3xl">
-          <p className="text-sm text-slate-400">Cargando turno...</p>
-        </div>
-      </main>
-    );
-  }
-
-  if (!appointment) {
-    return (
-      <main className="min-h-screen bg-slate-950 text-slate-100 flex justify-center p-4">
-        <div className="w-full max-w-3xl space-y-3">
-          <button
-            onClick={() => router.back()}
-            className="text-xs mb-2 text-slate-300 hover:text-slate-100"
-          >
-            ← Volver al panel
-          </button>
-          <p className="text-sm text-red-400">
-            No se encontró la información del turno.
-          </p>
-          {error && <p className="text-xs text-red-400">{error}</p>}
-        </div>
-      </main>
-    );
-  }
-
-  const {
-    clientName,
-    clientPhone,
-    date,
-    startTime,
-    endTime,
-    serviceName,
-    serviceColor,
-    status,
-    notes,
-  } = appointment;
-
-  return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 flex justify-center p-4">
-      <div className="w-full max-w-3xl space-y-4">
-        <button
-          onClick={() => router.back()}
-          className="text-xs text-slate-300 hover:text-slate-100"
-        >
-          ← Volver al panel
-        </button>
-
-        {/* Header */}
-        <header className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold">
-              <span style={{ color: PINK }}>Detalle</span> del turno
-            </h1>
-            <p className="text-xs text-slate-400 mt-1">
-              {date} · {startTime}
-              {endTime ? ` — ${endTime}` : ''}
-            </p>
-          </div>
-          <div
-            className={`px-3 py-1 rounded-full text-[11px] font-medium ${statusBadgeClasses(
-              status
-            )}`}
-          >
-            {statusLabelEs(status)}
-          </div>
-        </header>
-
-        {/* Tarjeta principal */}
-        <section className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-4">
-          {/* Datos básicos */}
-          <div className="flex items-start gap-3">
-            <div
-              className="w-10 h-10 rounded-full flex items-center justify-center text-xs font-semibold shadow-md shadow-black/40"
-              style={{ backgroundColor: serviceColor || PINK }}
-            >
-              {clientName?.[0] ?? '?'}
-            </div>
-            <div className="flex-1 space-y-1">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="text-sm font-semibold">{clientName}</h2>
-                {clientPhone && (
-                  <span className="text-[11px] text-slate-300">
-                    📞 {clientPhone}
-                  </span>
-                )}
-              </div>
-              <p className="text-[11px] text-slate-300">
-                Servicio:{' '}
-                <span className="font-medium text-slate-100">
-                  {serviceName}
-                </span>
-              </p>
-              <p className="text-[11px] text-slate-400">
-                Fecha:{' '}
-                <span className="text-slate-100">
-                  {date}
-                </span>{' '}
-                · Horario:{' '}
-                <span className="text-slate-100">
-                  {startTime}
-                  {endTime ? ` — ${endTime}` : ''}
-                </span>
-              </p>
-            </div>
-          </div>
-
-          {/* Notas */}
-          {notes && (
-            <div className="border border-slate-800 rounded-lg p-3 bg-slate-950/60">
-              <h3 className="text-xs font-semibold mb-1 text-slate-200">
-                Notas de la clienta
-              </h3>
-              <p className="text-xs text-slate-100 whitespace-pre-wrap">
-                {notes}
-              </p>
-            </div>
-          )}
-
-          {/* Acciones de estado */}
-          <div className="space-y-2">
-            <h3 className="text-xs font-semibold text-slate-300">
-              Cambiar estado del turno
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                disabled={actionLoading === 'confirm'}
-                onClick={() => handleAction('confirm')}
-                className="px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-500 text-slate-900 hover:bg-emerald-400 disabled:opacity-60"
-              >
-                {actionLoading === 'confirm'
-                  ? 'Confirmando...'
-                  : 'Marcar como confirmado'}
-              </button>
-
-              <button
-                type="button"
-                disabled={actionLoading === 'reject'}
-                onClick={() => handleAction('reject')}
-                className="px-3 py-1.5 rounded-full text-xs font-medium bg-red-500 text-slate-50 hover:bg-red-400 disabled:opacity-60"
-              >
-                {actionLoading === 'reject'
-                  ? 'Rechazando...'
-                  : 'Marcar como rechazado'}
-              </button>
-
-              <button
-                type="button"
-                disabled={actionLoading === 'cancel'}
-                onClick={() => handleAction('cancel')}
-                className="px-3 py-1.5 rounded-full text-xs font-medium bg-slate-600 text-slate-50 hover:bg-slate-500 disabled:opacity-60"
-              >
-                {actionLoading === 'cancel'
-                  ? 'Cancelando...'
-                  : 'Marcar como cancelado'}
-              </button>
-            </div>
-          </div>
-
-          {/* Acciones de comunicación */}
-          <div className="space-y-2 pt-2 border-t border-slate-800/60">
-            <h3 className="text-xs font-semibold text-slate-300">
-              Comunicación
-            </h3>
-            <div className="flex flex-wrap gap-2 items-center">
-              <button
-                type="button"
-                disabled={actionLoading === 'remind'}
-                onClick={handleRemind}
-                className="px-3 py-1.5 rounded-full text-xs font-medium border border-slate-500 bg-slate-950 hover:bg-slate-900 disabled:opacity-60"
-                style={{ borderColor: PINK, color: PINK }}
-              >
-                {actionLoading === 'remind'
-                  ? 'Abriendo WhatsApp...'
-                  : 'Reenviar mensaje por WhatsApp'}
-              </button>
-
-              {appointment.reminderSentAt && (
-                <span className="text-[10px] text-slate-400">
-                  Último recordatorio:{' '}
-                  <span className="text-slate-200">
-                    {new Date(appointment.reminderSentAt).toLocaleString()}
-                  </span>
-                </span>
-              )}
-            </div>
-          </div>
-
-          {error && (
-            <p className="text-xs text-red-400 pt-1">{error}</p>
-          )}
-        </section>
-      </div>
-    </main>
-  );
+  return <main className="min-h-screen bg-[#f4f1ec] p-4 text-slate-900 sm:p-8"><div className="mx-auto w-full max-w-3xl space-y-5"><button type="button" onClick={() => router.back()} className="min-h-11 rounded-full px-3 text-sm font-semibold text-slate-600 hover:bg-white">Volver al panel</button><header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-indigo-700">Detalle del turno</p><h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-slate-950">{appointment.clientName}</h1><p className="mt-1 text-sm capitalize text-slate-500">{appointment.date} · {appointment.startTime}{appointment.endTime ? ` - ${appointment.endTime}` : ''}</p></div><span className="w-fit rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">Estado: {statusLabel(appointment.status)}</span></header><section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><div className="grid gap-5 sm:grid-cols-2"><Info label="Servicio" value={appointment.serviceName} /><Info label="Duración" value={duration(appointment) || 'No disponible'} /><Info label="Teléfono" value={appointment.clientPhone || 'No disponible'} /><Info label="Horario" value={`${appointment.startTime}${appointment.endTime ? ` - ${appointment.endTime}` : ''}`} /></div>{appointment.notes && <div className="mt-6 rounded-xl bg-slate-50 p-4"><h2 className="text-sm font-semibold text-slate-800">Notas de la clienta</h2><p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{appointment.notes}</p></div>}<div className="mt-6 border-t border-slate-100 pt-5"><h2 className="text-sm font-semibold text-slate-800">Acciones</h2><div className="mt-3 flex flex-wrap gap-2">{appointment.status === 'request' && <><ActionButton onClick={() => setPendingAction('confirm')} color="primary" theme={theme}>Confirmar turno</ActionButton><ActionButton onClick={() => setPendingAction('reject')} color="danger" theme={theme}>Rechazar solicitud</ActionButton></>}{appointment.status === 'confirmed' && <ActionButton onClick={() => setPendingAction('cancel')} color="neutral" theme={theme}>Cancelar turno</ActionButton>}{!['cancelled', 'rejected'].includes(appointment.status) && <ActionButton onClick={() => void handleReminder()} disabled={actionLoading === 'remind'} color="outline" theme={theme}>{actionLoading === 'remind' ? 'Abriendo WhatsApp...' : 'Recordar por WhatsApp'}</ActionButton>}</div><p className="mt-3 text-sm text-slate-500">Los mensajes se envían manualmente por WhatsApp. No hay recordatorios automáticos.</p>{appointment.reminderSent && <p className="mt-2 text-sm text-slate-500">Último recordatorio enviado.</p>}</div>{feedback && <p className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">{feedback}</p>}{error && <p className="mt-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800" role="alert">{error}</p>}</section>{pendingAction && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4"><div role="dialog" aria-modal="true" aria-labelledby="detail-confirm-title" className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"><h2 id="detail-confirm-title" className="text-lg font-semibold text-slate-950">¿Querés {actionLabel(pendingAction)} este turno?</h2><p className="mt-2 text-sm text-slate-600">{appointment.clientName} · {appointment.date} a las {appointment.startTime}.</p><div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setPendingAction(null)} className="min-h-11 rounded-full border border-slate-300 px-4 text-sm font-semibold text-slate-700">Cancelar</button><button type="button" autoFocus disabled={actionLoading !== null} onClick={() => { const action = pendingAction; setPendingAction(null); void handleAction(action); }} className="min-h-11 rounded-full bg-slate-900 px-4 text-sm font-semibold text-white disabled:opacity-60">{actionLoading ? 'Procesando...' : `Sí, ${actionLabel(pendingAction)}`}</button></div></div></div>}</div></main>;
 }
+
+function Info({ label, value }: { label: string; value: string }) { return <div><p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">{label}</p><p className="mt-1 text-base font-semibold text-slate-900">{value}</p></div>; }
+function ActionButton({ children, onClick, disabled, color, theme }: { children: React.ReactNode; onClick: () => void; disabled?: boolean; color: 'primary' | 'danger' | 'neutral' | 'outline'; theme: BrandConfig }) { const classes = color === 'danger' ? 'bg-rose-600 text-white hover:bg-rose-700' : color === 'neutral' ? 'bg-slate-700 text-white hover:bg-slate-800' : color === 'outline' ? 'border border-indigo-300 bg-white text-indigo-700 hover:bg-indigo-50' : 'text-white hover:opacity-90'; return <button type="button" onClick={onClick} disabled={disabled} className={`min-h-11 rounded-full px-4 text-sm font-semibold disabled:opacity-60 ${classes}`} style={color === 'primary' ? { backgroundColor: theme.primary } : undefined}>{children}</button>; }

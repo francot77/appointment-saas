@@ -65,7 +65,9 @@ export default function CalendarTab({ brand }: CalendarTabProps) {
 
   const [scheduleDays, setScheduleDays] = useState<ScheduleDayType[]>([]);
   const [loadingSchedule, setLoadingSchedule] = useState(false);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [mode, setMode] = useState<CalendarMode>('admin');
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   // Fecha base = hoy
   useEffect(() => {
@@ -120,17 +122,21 @@ export default function CalendarTab({ brand }: CalendarTabProps) {
 
   async function loadSchedule() {
     setLoadingSchedule(true);
+    setScheduleError(null);
     try {
       const res = await fetch('/api/admin/schedule');
       const json = await res.json();
       if (!res.ok) {
-        console.error(json.error || 'Error cargando horarios');
+        const message = json.error || 'Error cargando horarios';
+        console.error(message);
+        setScheduleError(message);
         setScheduleDays([]);
       } else {
         setScheduleDays(json.days || []);
       }
     } catch (e) {
       console.error(e);
+      setScheduleError('No se pudieron cargar los horarios del negocio.');
       setScheduleDays([]);
     } finally {
       setLoadingSchedule(false);
@@ -140,40 +146,49 @@ export default function CalendarTab({ brand }: CalendarTabProps) {
  
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-6 text-slate-900">
       {/* Filtros / controles */}
-      <section className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-slate-400">
+          <label className="text-sm font-semibold text-slate-700">
             Semana a visualizar
           </label>
           <input
             type="date"
             value={baseDate}
             onChange={(e) => setBaseDate(e.target.value)}
-            className="bg-slate-950 border border-slate-700 text-sm rounded-md px-2 py-1"
+            className="mt-1 min-h-11 rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
           />
           {week && (
-            <span className="text-[10px] text-slate-500">
-              Semana del {week.from} al {week.to} (lun a vie)
+            <span className="text-sm text-slate-500">
+              Semana del {week.from} al {week.to} (lunes a viernes)
             </span>
           )}
           {loadingSchedule && (
-            <span className="text-[10px] text-slate-500">
+            <span className="text-sm text-slate-500">
               Cargando horarios del negocio...
+            </span>
+          )}
+          {scheduleError && (
+            <span className="text-sm text-rose-700" role="alert">
+              {scheduleError}
+              <button type="button" className="ml-2 font-semibold underline" onClick={() => void loadSchedule()}>
+                Reintentar
+              </button>
             </span>
           )}
         </div>
 
         <div className="flex flex-col gap-2">
-          <div className="inline-flex rounded-full border border-slate-700 overflow-hidden text-[11px] self-start">
+          <div className="inline-flex rounded-xl border border-slate-300 bg-white p-1 self-start">
             <button
               type="button"
               onClick={() => setMode('admin')}
-              className={`px-3 py-1 ${
+                aria-pressed={mode === 'admin'}
+                className={`min-h-10 rounded-lg px-3 text-sm font-semibold ${
                 mode === 'admin'
-                  ? 'bg-slate-100 text-slate-900'
-                  : 'bg-slate-900 text-slate-300'
+                  ? 'bg-slate-900 text-white'
+                  : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
               Vista admin
@@ -181,10 +196,11 @@ export default function CalendarTab({ brand }: CalendarTabProps) {
             <button
               type="button"
               onClick={() => setMode('share')}
-              className={`px-3 py-1 ${
+                aria-pressed={mode === 'share'}
+                className={`min-h-10 rounded-lg px-3 text-sm font-semibold ${
                 mode === 'share'
-                  ? 'bg-slate-100 text-slate-900'
-                  : 'bg-slate-900 text-slate-300'
+                  ? 'bg-slate-900 text-white'
+                  : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
               Vista para compartir
@@ -195,13 +211,14 @@ export default function CalendarTab({ brand }: CalendarTabProps) {
 
           {loading && (
             <span className="text-xs text-slate-400">
-              Cargando turnos...
+              Cargando agenda...
             </span>
           )}
 
           {error && (
-            <span className="text-xs text-red-400">
+            <span className="text-sm text-rose-700" role="alert">
               {error}
+              <button type="button" className="ml-2 font-semibold underline" onClick={() => week && void loadWeekAppointments(week)}>Reintentar</button>
             </span>
           )}
         </div>
@@ -215,14 +232,16 @@ export default function CalendarTab({ brand }: CalendarTabProps) {
         />
       )}
 
-      {week && mode === 'share' && (
+      {week && mode === 'share' && !scheduleError && (
         <ShareWeekCalendar
           week={week}
           appointments={appointments}
           scheduleDays={scheduleDays}
           theme={theme}
+          onFeedback={setFeedback}
         />
       )}
+      {feedback && <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800" role="status">{feedback}</p>}
     </div>
   );
 }
@@ -278,11 +297,11 @@ function WeekCalendar({ week, appointments, theme }: WeekCalendarProps) {
   const hasAppointments = confirmed.length > 0;
 
   return (
-    <section className="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-3">
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold">Agenda semanal</h2>
-        <span className="text-[11px] text-slate-400">
-          Vista tipo calendario (solo confirmados)
+        <h2 className="text-xl font-semibold tracking-[-0.02em] text-slate-950">Agenda semanal</h2>
+        <span className="text-sm text-slate-500">
+          Turnos confirmados · seleccioná uno para ver el detalle
         </span>
       </div>
 
@@ -295,7 +314,7 @@ function WeekCalendar({ week, appointments, theme }: WeekCalendarProps) {
       >
         {/* Columna horas */}
         <div
-          className="relative text-[10px] text-slate-400 border-r border-slate-800"
+          className="relative text-xs text-slate-500 border-r border-slate-200"
           style={{ gridRow: '1 / span 2' }}
         >
           <div
@@ -324,10 +343,10 @@ function WeekCalendar({ week, appointments, theme }: WeekCalendarProps) {
         {week.days.map((day, idx) => (
           <div
             key={day.date}
-            className="flex items-center justify-center border-b border-slate-800 bg-slate-900/95 text-center"
+            className="flex items-center justify-center border-b border-slate-200 bg-white text-center"
             style={{ gridRow: 1, gridColumn: idx + 2 }}
           >
-            <span className="text-[10px] text-slate-200 font-medium">
+            <span className="text-sm text-slate-700 font-semibold">
               {day.label}
             </span>
           </div>
@@ -342,7 +361,7 @@ function WeekCalendar({ week, appointments, theme }: WeekCalendarProps) {
           return (
             <div
               key={day.date + '-body'}
-              className="relative border-l border-slate-900/40"
+              className="relative border-l border-slate-100"
               style={{ gridRow: 2, gridColumn: idx + 2 }}
             >
               <div
@@ -356,7 +375,7 @@ function WeekCalendar({ week, appointments, theme }: WeekCalendarProps) {
                   return (
                     <div
                       key={h}
-                      className="absolute left-0 right-0 border-t border-slate-800/70"
+                      className="absolute left-0 right-0 border-t border-slate-200"
                       style={{ top: `${topPct}%` }}
                     />
                   );
@@ -385,30 +404,30 @@ function WeekCalendar({ week, appointments, theme }: WeekCalendarProps) {
                     const color = a.serviceColor || theme.primary;
 
                     return (
-                      <div
+                      <button
+                        type="button"
                         key={a.id}
-                        onClick={() =>
-                          router.push(`/dashboard/appointments/${a.id}`)
-                        }
-                        className="absolute left-[8%] right-[8%] rounded-md shadow-md cursor-pointer px-1.5 py-1 text-[10px] overflow-hidden"
+                        onClick={() => router.push(`/dashboard/appointments/${a.id}`)}
+                        aria-label={`Ver turno de ${a.clientName}, ${a.startTime}, ${a.serviceName}`}
+                        className="absolute left-[8%] right-[8%] min-h-[42px] rounded-lg text-left shadow-sm cursor-pointer px-2 py-1.5 text-xs overflow-hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
                         style={{
                           top: `${top}%`,
                           height: `${height}%`,
                           minHeight: '30px',
-                          backgroundColor: `${color}33`,
+                          backgroundColor: `${color}18`,
                           borderLeft: `3px solid ${color}`,
                         }}
                       >
-                        <div className="font-semibold leading-tight truncate">
+                        <div className="font-bold leading-tight truncate text-slate-900">
                           {a.startTime}
                         </div>
-                        <div className="font-semibold leading-tight truncate">
+                        <div className="font-semibold leading-tight truncate text-slate-800">
                           {a.clientName}
                         </div>
-                        <div className="text-[9px] leading-tight text-slate-100/80 truncate">
+                        <div className="text-xs leading-tight text-slate-600 truncate">
                           {a.serviceName}
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
               </div>
@@ -418,7 +437,7 @@ function WeekCalendar({ week, appointments, theme }: WeekCalendarProps) {
 
         {!hasAppointments && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <p className="text-xs text-slate-500">
+            <p className="text-sm text-slate-500">
               No hay turnos confirmados en esta semana.
             </p>
           </div>
@@ -435,6 +454,7 @@ type ShareWeekCalendarProps = {
   appointments: AdminAppointment[];
   scheduleDays: ScheduleDayType[];
   theme: BrandConfig;
+  onFeedback: (message: string) => void;
 };
 
 type SlotStatus = 'closed' | 'free' | 'busy';
@@ -444,6 +464,7 @@ function ShareWeekCalendar({
   appointments,
   scheduleDays,
   theme,
+  onFeedback,
 }: ShareWeekCalendarProps) {
   const SLOT_MINUTES = 30;
 
@@ -698,7 +719,7 @@ function ShareWeekCalendar({
       a.click();
     } catch (e) {
       console.error(e);
-      alert('No se pudo generar la imagen.');
+      onFeedback('No se pudo generar la imagen.');
     }
   }
 
@@ -726,33 +747,31 @@ function ShareWeekCalendar({
         a.href = dataUrl;
         a.download = 'agenda-semanal.png';
         a.click();
-        alert(
-          'Tu navegador no permite compartir directamente la imagen. La descargamos para que la subas a Instagram.'
-        );
+          onFeedback('Tu navegador no permite compartir directamente la imagen. Se descargó la imagen para compartirla manualmente.');
       }
     } catch (e) {
       console.error(e);
-      alert('No se pudo compartir la imagen.');
+      onFeedback('No se pudo compartir la imagen.');
     }
   }
 
   return (
-    <section className="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-3">
+    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-semibold">
+            <h2 className="text-xl font-semibold tracking-[-0.02em] text-slate-950">
             Agenda semanal para compartir
           </h2>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-sm text-slate-500">
             Muestra sólo horarios libres / ocupados (sin nombres).
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={handleShareImage}
-            className="text-[11px] px-3 py-1 rounded-full shadow-sm"
+            className="min-h-11 rounded-full px-4 text-sm font-semibold shadow-sm"
             style={{
               backgroundColor: theme.primary,
               color: theme.textOnPrimary || '#020617',
@@ -764,7 +783,7 @@ function ShareWeekCalendar({
           <button
             type="button"
             onClick={handleExportImage}
-            className="text-[11px] px-3 py-1 rounded-full border border-slate-600 text-slate-100 hover:bg-slate-800"
+            className="min-h-11 rounded-full border border-slate-300 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
             Descargar PNG
           </button>
@@ -773,7 +792,7 @@ function ShareWeekCalendar({
 
       {/* Preview HTML (para que el usuario vea lo que se va a compartir) */}
       <div className="rounded-2xl border border-slate-800 bg-slate-950/95 p-3">
-        <div className="flex items-center justify-center gap-4 mb-3 text-[10px] text-slate-300">
+        <div className="flex flex-wrap items-center justify-center gap-4 mb-3 text-sm text-slate-600">
           <div className="flex items-center gap-1.5">
             <span
               className="inline-block h-3 w-3 rounded-[4px]"
@@ -862,7 +881,7 @@ function ShareWeekCalendar({
           </div>
         </div>
 
-        <p className="mt-3 text-[9px] text-slate-500 text-center">
+        <p className="mt-3 text-sm text-slate-500 text-center">
           Compartí este esquema en tus historias para mostrar tus horarios libres.
         </p>
       </div>

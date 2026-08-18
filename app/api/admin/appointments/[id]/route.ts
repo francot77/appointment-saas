@@ -3,10 +3,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import crypto from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { Appointment } from '@/lib/models/Appointment';
+import { AppointmentBookingLock } from '@/lib/models/AppointmentBookingLock';
 import { Service } from '@/lib/models/Service';
+import { ScheduleDay } from '@/lib/models/ScheduleDay';
 import { getCurrentBusiness } from '@/lib/currentBusiness';
 import { apiError } from '@/lib/apiError';
+import { date as validateDate, time as validateTime } from '@/lib/validation';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -29,6 +33,62 @@ function minutesToTime(mins: number): string {
   const h = Math.floor(mins / 60);
   const m = mins % 60;
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function isTransactionUnavailable(err: any) {
+  return err?.code === 20
+    || err?.code === 24
+    || err?.code === 50
+    || err?.code === 112
+    || err?.code === 251
+    || err?.message?.includes('Transaction numbers are only allowed');
+}
+
+export async function GET(_req: NextRequest, props: Params) {
+  const params = await props.params;
+
+  try {
+    const business = await getCurrentBusiness({ requireEntitlement: true });
+    await dbConnect();
+
+    const appt = await Appointment.findOne({
+      _id: params.id,
+      businessId: business._id,
+    }).lean();
+
+    if (!appt) {
+      return apiError('Turno no encontrado', 404);
+    }
+
+    const service = await Service.findOne({
+      _id: appt.serviceId,
+      businessId: business._id,
+    }).lean();
+
+    const appointment = {
+      id: String(appt._id),
+      clientName: appt.clientName,
+      clientPhone: appt.clientPhone,
+      serviceId: String(appt.serviceId),
+      serviceName: service?.name || 'Servicio',
+      serviceColor: service?.color || '#64748b',
+      date: appt.date,
+      startTime: appt.startTime,
+      endTime: appt.endTime,
+      status: appt.status,
+      notes: appt.notes || '',
+      reminderSent: appt.reminderSent ?? false,
+      lastReminderAt: appt.lastReminderAt?.toISOString() ?? null,
+    };
+
+    return NextResponse.json({ appointment }, { status: 200 });
+  } catch (err: any) {
+    if (err.message === 'UNAUTHORIZED') return apiError('Unauthorized', 401);
+    if (err.message === 'NO_BUSINESS') return apiError('No business', 403);
+    if (err.message === 'BILLING_REQUIRED') return apiError('Billing required', 402, 'FORBIDDEN');
+    console.error('GET /admin/appointments/[id] error', err);
+    return apiError('Internal error', 500);
+  }
 }
 
 export async function PATCH(req: NextRequest, props: Params) {
@@ -69,9 +129,15 @@ export async function PATCH(req: NextRequest, props: Params) {
     let waMessage: string | null = null;
     let reminderSent = appt.reminderSent ?? false;
     const update: any = {};
+    let updatedAppointment: any = null;
+    let expectedStatus: string | null = null;
 
     // ---------- CONFIRM / REJECT / REMIND ----------
-        if (action === 'confirm') {
+    if (action === 'confirm') {
+      if (appt.status !== 'request') {
+        return apiError('Solo se pueden confirmar solicitudes pendientes', 409);
+      }
+      expectedStatus = 'request';
       newStatus = 'confirmed';
       update.status = newStatus;
 
@@ -101,15 +167,33 @@ export async function PATCH(req: NextRequest, props: Params) {
         `\n\n*🔁 Reprogramar o cancelar tu turno*\n` +
         `${magicLink}\n\n` +
         `Guardá este link, es único para este turno.`;
-    }
- else if (action === 'reject') {
+    } else if (action === 'reject') {
+      if (appt.status !== 'request') {
+        return apiError('Solo se pueden rechazar solicitudes pendientes', 409);
+      }
+      expectedStatus = 'request';
       newStatus = 'rejected';
       update.status = newStatus;
 
       waMessage =
         `Hola ${clientName}, lamentablemente no podemos tomar tu turno para ${serviceName} ` +
         `el ${date} a las ${time}. Si querés, podés pedir otro horario desde el link de turnos.`;
+    } else if (action === 'cancel') {
+      if (appt.status !== 'confirmed') {
+        return apiError('Solo se pueden cancelar turnos confirmados', 409);
+      }
+
+      expectedStatus = 'confirmed';
+      newStatus = 'cancelled';
+      update.status = newStatus;
+      waMessage =
+        `Hola ${clientName}, cancelamos tu turno para ${serviceName} ` +
+        `el ${date} a las ${time}. Si querés, podés pedir otro horario desde el link de turnos.`;
     } else if (action === 'remind') {
+      if (!['request', 'confirmed'].includes(appt.status)) {
+        return apiError('Solo se pueden recordar turnos pendientes o confirmados', 409);
+      }
+      expectedStatus = appt.status;
       reminderSent = true;
       update.reminderSent = true;
       update.lastReminderAt = new Date();
@@ -134,12 +218,10 @@ export async function PATCH(req: NextRequest, props: Params) {
         );
       }
 
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(newDate)) {
-        return apiError('Formato de fecha inválido (YYYY-MM-DD)', 400);
-      }
-      if (!/^\d{2}:\d{2}$/.test(newStartTime)) {
-        return apiError('Formato de hora inválido (HH:MM)', 400);
-      }
+      const dateResult = validateDate(newDate, 'newDate');
+      if (!dateResult.ok) return apiError(dateResult.error, 400);
+      const timeResult = validateTime(newStartTime, 'newStartTime');
+      if (!timeResult.ok) return apiError(timeResult.error, 400);
 
       const duration =
         (service && service.durationMinutes) ? service.durationMinutes : 60;
@@ -149,35 +231,113 @@ export async function PATCH(req: NextRequest, props: Params) {
         return apiError('Hora inválida', 400);
       }
       const endMins = startMins + duration;
+      if (endMins > 24 * 60) {
+        return apiError('El turno excede el límite del día', 400);
+      }
       const newEndTime = minutesToTime(endMins);
 
-      // Buscar OTROS turnos del mismo día que se solapen, excluyendo este turno
-      const sameDay = await Appointment.find({
-        businessId: business._id,
-        date: newDate,
-        status: { $in: ['request', 'confirmed'] },
-      }).lean();
+      const lockKey = `${String(business._id)}:${newDate}`;
+      const lockToken = randomUUID();
+      const connection = await dbConnect();
+      const session = await connection.startSession();
+      let earlyResponse: NextResponse | null = null;
 
-      const overlaps = sameDay.some((other: any) => {
-        // excluir el propio turno
-        if (String(other._id) === String(appt._id)) return false;
+      try {
+        updatedAppointment = await session.withTransaction(async () => {
+          await AppointmentBookingLock.updateOne(
+            { key: lockKey },
+            { $set: { token: lockToken, expiresAt: null }, $setOnInsert: { key: lockKey } },
+            { upsert: true, session }
+          );
 
-        const oStart = parseTimeToMinutes(other.startTime);
-        const oEnd = parseTimeToMinutes(other.endTime);
-        if (Number.isNaN(oStart) || Number.isNaN(oEnd)) return false;
+          const current = await Appointment.findOne({
+            _id: id,
+            businessId: business._id,
+          }).session(session).lean();
 
-        // solape clásico: start < otherEnd && end > otherStart
-        return startMins < oEnd && endMins > oStart;
-      });
+          const releaseLock = () => AppointmentBookingLock.deleteOne(
+            { key: lockKey, token: lockToken },
+            { session }
+          );
 
-      if (overlaps) {
-        return apiError('Ese horario ya está ocupado', 409);
+          if (!current) {
+            await releaseLock();
+            earlyResponse = apiError('Turno no encontrado', 404);
+            return null;
+          }
+
+          if (!['request', 'confirmed'].includes(current.status)) {
+            await releaseLock();
+            earlyResponse = apiError('Solo se pueden reprogramar turnos pendientes o confirmados', 409);
+            return null;
+          }
+
+          const weekday = new Date(`${newDate}T00:00:00Z`).getUTCDay();
+          const schedule = await ScheduleDay.findOne({
+            businessId: business._id,
+            weekday,
+          }).session(session).lean();
+          const enabledBlock = (schedule?.blocks || []).some((block: any) => {
+            if (block.enabled === false) return false;
+            const blockStart = parseTimeToMinutes(block.start);
+            const blockEnd = parseTimeToMinutes(block.end);
+            return Number.isFinite(blockStart) && Number.isFinite(blockEnd)
+              && blockStart < blockEnd
+              && startMins >= blockStart
+              && endMins <= blockEnd;
+          });
+
+          if (!enabledBlock) {
+            await releaseLock();
+            earlyResponse = apiError('El horario elegido está fuera de los bloques habilitados', 409);
+            return null;
+          }
+
+          const sameDay = await Appointment.find({
+            businessId: business._id,
+            date: newDate,
+            status: { $in: ['request', 'confirmed'] },
+          }).session(session).lean();
+
+          const overlaps = sameDay.some((other: any) => {
+            if (String(other._id) === String(current._id)) return false;
+            const oStart = parseTimeToMinutes(other.startTime);
+            const oEnd = parseTimeToMinutes(other.endTime);
+            if (Number.isNaN(oStart) || Number.isNaN(oEnd)) return false;
+            return startMins < oEnd && endMins > oStart;
+          });
+
+          if (overlaps) {
+            await releaseLock();
+            earlyResponse = apiError('Ese horario ya está ocupado', 409);
+            return null;
+          }
+
+          const result = await Appointment.findOneAndUpdate(
+            { _id: id, businessId: business._id, status: { $in: ['request', 'confirmed'] } },
+            { date: newDate, startTime: newStartTime, endTime: newEndTime },
+            { new: true, session }
+          ).lean();
+
+          await releaseLock();
+          if (!result) {
+            earlyResponse = apiError('Solo se pueden reprogramar turnos pendientes o confirmados', 409);
+          }
+          return result;
+        });
+
+        if (earlyResponse) return earlyResponse;
+      } catch (error: any) {
+        if (error?.code === 11000) {
+          return apiError('Hay otra reprogramación en curso para ese día. Intentá nuevamente.', 409, 'CONFLICT');
+        }
+        if (isTransactionUnavailable(error)) {
+          return apiError('La reprogramación no está disponible temporalmente', 503, 'INTERNAL');
+        }
+        throw error;
+      } finally {
+        await session.endSession();
       }
-
-      // OK, actualizamos fecha y horarios
-      update.date = newDate;
-      update.startTime = newStartTime;
-      update.endTime = newEndTime;
 
       // Podés cambiar el mensaje si querés
       waMessage =
@@ -189,11 +349,20 @@ export async function PATCH(req: NextRequest, props: Params) {
     }
 
     // aplicamos update
-    const updated = await Appointment.findOneAndUpdate(
-      { _id: id, businessId: business._id },
-      update,
-      { new: true }
-    ).lean();
+    let updated = updatedAppointment;
+    if (!updated) {
+      const mutationFilter: any = { _id: id, businessId: business._id };
+      if (expectedStatus) mutationFilter.status = expectedStatus;
+      updated = await Appointment.findOneAndUpdate(
+        mutationFilter,
+        update,
+        { new: true }
+      ).lean();
+    }
+
+    if (!updated) {
+      return apiError('Este turno ya no está disponible para esa acción', 409, 'CONFLICT');
+    }
 
     const waUrl = waMessage
       ? buildWhatsAppUrl(appt.clientPhone, waMessage)
