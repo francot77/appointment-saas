@@ -47,6 +47,23 @@ FezTime has public booking, authenticated business management, MongoDB persisten
 
 **Rollback boundary:** Remove only the public business page implementation in `app/[slug]/page.tsx` and `app/[slug]/BusinessLandingClient.tsx`, plus this work-unit entry. Preserve unrelated dirty-worktree changes.
 
+## Visual Work Unit: Public booking flow
+
+**Outcome:** Help mobile customers understand and complete a booking request confidently in under a minute, without changing public API behavior or inventing confirmation/reminder promises.
+
+**Scope:** `app/[slug]/TurnosClient.tsx`, `app/[slug]/turno-recibido/page.tsx`, and this roadmap entry only. Dashboard, billing, and appointment API routes remain unchanged.
+
+**Acceptance criteria:**
+
+- [x] Editorial-light booking surface follows the public business page while safely using tenant colors as guarded accents.
+- [x] Four steps have readable 15–16px controls, current/completed states, touch targets, labels, focus states, and non-color status cues.
+- [x] Service, date, availability, time, customer details, and a final pre-submit summary are scannable on mobile.
+- [x] Availability loading, empty, error, and retry states are distinct and use live status feedback.
+- [x] Confirmation explains received/requested versus confirmed semantics, shows the API reference when available, and honestly describes WhatsApp/manual confirmation.
+- [x] `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check` pass; browser smoke is recorded when an available local port permits it.
+
+**Rollback boundary:** Remove only the booking-flow implementation in `app/[slug]/TurnosClient.tsx`, `app/[slug]/turno-recibido/page.tsx`, and this work-unit entry. Preserve unrelated dirty-worktree changes.
+
 ## Visual Work Unit: Settings UX
 
 **Outcome:** Make business settings understandable and actionable for owners, without changing the existing settings or slug API contracts.
