@@ -23,6 +23,25 @@ FezTime has public booking, authenticated business management, MongoDB persisten
 
 **Rollback boundary:** Remove only the landing implementation in `app/page.tsx`, landing rules appended to `app/globals.css`, and this work-unit entry. Do not revert unrelated dirty-worktree changes.
 
+## Visual Work Unit: Demo, Editorial clara
+
+**Outcome:** Make `/demo` feel like the same FezTime product as the public booking and dashboard surfaces while keeping the walkthrough explicitly simulated.
+
+**Scope:** `app/demo/page.tsx` and this roadmap entry only. Real booking, dashboard, billing, authentication, APIs, and shared landing styles remain unchanged.
+
+**Acceptance criteria:**
+
+- [x] Demo uses the Editorial-light canvas, readable typography, restrained indigo/coral accents, existing FezTime logo, responsive cards, and no dark SaaS/glow/emoji treatment.
+- [x] Demo framing identifies the surface as a preview, labels example data as fictitious, explains that changes do not persist, and exposes `/register` and `/login` paths.
+- [x] The five-step walkthrough remains available; slot and reschedule selections are local preview interactions, while non-functional admin actions are presented as explanatory text instead of fake buttons.
+- [x] Focus states, keyboard semantics, contrast, touch targets, and no horizontal overflow are verified at desktop and 390px mobile widths.
+- [x] No customer metrics, testimonials, automation claims, or new dependencies are introduced.
+- [x] `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check` pass; browser smoke is recorded when an available local port permits it.
+
+**Execution log:** Implemented after `03c72f7` without modifying unrelated dirty-worktree files. Verification and browser results are recorded in the delivery response.
+
+**Rollback boundary:** Remove only `app/demo/page.tsx` and this work-unit entry. Preserve all real booking, dashboard, billing, auth, API behavior, and unrelated dirty-worktree changes.
+
 ## Priority Model
 
 | Priority | Meaning | Launch rule |
