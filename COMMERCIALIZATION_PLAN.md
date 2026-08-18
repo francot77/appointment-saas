@@ -83,6 +83,22 @@ FezTime has public booking, authenticated business management, MongoDB persisten
 
 **Rollback boundary:** Remove only the Settings UX implementation in `app/dashboard/SettingsTab.tsx` and this roadmap entry. Preserve all unrelated dirty-worktree changes and existing API behavior.
 
+## Visual Work Unit: Dashboard shell and navigation
+
+**Outcome:** Make the authenticated workspace feel like a trustworthy operational product, with a clear next action and usable hierarchy across desktop and mobile.
+
+**Scope:** `app/dashboard/DashboardClient.tsx` and this roadmap entry only. Appointments, calendar, schedule, services, settings content, API contracts, and activation data fetching remain unchanged.
+
+**Acceptance criteria:**
+
+- [x] Editorial-light neutral shell preserves tenant branding as accents and keeps the five existing destinations.
+- [x] Navigation uses accessible local SVG icons, selected/current semantics, keyboard focus states, a desktop sidebar, and mobile bottom navigation.
+- [x] Header hierarchy names the business, identifies the current page, exposes the existing billing route, and keeps activation progress as the primary next action without duplicate fetching or invented metrics.
+- [x] Responsive spacing, readable hierarchy, and no excessive max-width compression are implemented without redesigning tab content.
+- [x] `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check` pass; browser smoke is recorded when an available local port permits it.
+
+**Rollback boundary:** Remove only the dashboard shell/navigation implementation in `app/dashboard/DashboardClient.tsx` and this work-unit entry. Preserve unrelated dirty-worktree changes.
+
 ## Execution Path
 
 ### Baseline and Stabilization
