@@ -1,9 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getEffectiveBillingStatus, hasBusinessEntitlement } from '@/lib/billingEntitlements';
+import { getAcceptedBasicPricesARS, getBasicPriceARS, getPublicAppUrl, parseBasicPriceARS } from '@/lib/billingConfig';
+import { validateProviderPayment } from '@/lib/billingReconciliation';
 import { rangesOverlap, timeToMinutes, minutesToTime } from '@/lib/time';
 import { date, email, positiveInteger, time } from '@/lib/validation';
 import { validateSlug } from '@/lib/slug';
 import { publicBookingRateLimit } from '@/lib/publicRateLimit';
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe('validation helpers', () => {
   it('normalizes valid email and rejects invalid dates and times', () => {
@@ -41,6 +47,59 @@ describe('billing entitlement helpers', () => {
     expect(hasBusinessEntitlement({ ...business, paidUntil: new Date('2026-01-02') }, now)).toBe(true);
     expect(hasBusinessEntitlement({ ...business, paidUntil: new Date('2025-12-31') }, now)).toBe(false);
     expect(getEffectiveBillingStatus({ ...business, paidUntil: new Date('2025-12-31') }, now)).toBe('expired');
+  });
+});
+
+describe('billing payment configuration', () => {
+  it('parses positive integer ARS prices and keeps a safe non-production default', () => {
+    expect(parseBasicPriceARS('100')).toBe(100);
+    expect(parseBasicPriceARS('100.50')).toBeNull();
+    expect(parseBasicPriceARS('-1')).toBeNull();
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('MP_BASIC_PRICE_ARS', '');
+    expect(getBasicPriceARS()).toBe(10000);
+  });
+
+  it('fails closed in production when price or public URL configuration is unsafe', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('MP_BASIC_PRICE_ARS', 'invalid');
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', 'http://localhost:3000');
+    expect(() => getBasicPriceARS()).toThrow('BILLING_PRICE_NOT_CONFIGURED');
+    vi.stubEnv('MP_BASIC_PRICE_ARS', '100');
+    expect(() => getPublicAppUrl()).toThrow('PUBLIC_APP_URL_INVALID');
+  });
+
+  it('accepts the current price and explicitly listed transition prices only', () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('MP_BASIC_PRICE_ARS', '10000');
+    vi.stubEnv('MP_ACCEPTED_PRICES_ARS', '100,10000,100');
+    expect(getAcceptedBasicPricesARS()).toEqual([10000, 100]);
+
+    const payment = (amount: number) => ({
+      external_reference: '507f1f77bcf86cd799439011',
+      transaction_amount: amount,
+      currency_id: 'ARS',
+      status: 'approved',
+      additional_info: { items: [{ id: 'basic-monthly', unit_price: amount, quantity: 1 }] },
+    });
+    expect(() => validateProviderPayment(payment(100))).not.toThrow();
+    expect(() => validateProviderPayment(payment(10000))).not.toThrow();
+
+    vi.stubEnv('MP_ACCEPTED_PRICES_ARS', '10000');
+    expect(() => validateProviderPayment(payment(100))).toThrow('PAYMENT_INVALID');
+  });
+
+  it('rejects malformed accepted-price configuration in production', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('MP_BASIC_PRICE_ARS', '10000');
+    vi.stubEnv('MP_ACCEPTED_PRICES_ARS', '100,not-a-price');
+    expect(() => getAcceptedBasicPricesARS()).toThrow('BILLING_ACCEPTED_PRICES_INVALID');
+  });
+
+  it('uses the configured public URL outside production', () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('APP_URL', 'https://payments.example.test/');
+    expect(getPublicAppUrl()).toBe('https://payments.example.test');
   });
 });
 

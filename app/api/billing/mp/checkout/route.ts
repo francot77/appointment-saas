@@ -4,12 +4,15 @@ import { NextResponse } from 'next/server';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import dbConnect from '@/lib/db';
 import { getCurrentBusiness } from '@/lib/currentBusiness';
-import { BASIC_PRICE_ARS, BASIC_PRODUCT_ID } from '@/lib/billingEntitlements';
+import { BASIC_PRODUCT_ID } from '@/lib/billingEntitlements';
+import { getBasicPriceARS, getPublicAppUrl } from '@/lib/billingConfig';
 
 export const runtime = 'nodejs';
 
 export async function POST() {
   try {
+    const basicPriceARS = getBasicPriceARS();
+    const appUrl = getPublicAppUrl();
     await dbConnect();
     const business: any = await getCurrentBusiness();
 
@@ -37,11 +40,6 @@ export async function POST() {
     const client = new MercadoPagoConfig({ accessToken });
     const preference = new Preference(client);
 
-    const appUrl =
-      process.env.NEXT_PUBLIC_APP_URL ||
-      process.env.APP_URL ||
-      'http://localhost:3000';
-
     // URLs de retorno correctas
     const backUrls = {
       success: `${appUrl}/billing?status=success`,
@@ -51,7 +49,7 @@ export async function POST() {
 
     console.log('[MP CHECKOUT] Creating preference', {
       businessId: business._id.toString(),
-        price: BASIC_PRICE_ARS,
+        price: basicPriceARS,
       appUrl,
       environment: isProduction ? 'production' : 'test',
     });
@@ -64,7 +62,7 @@ export async function POST() {
             id: BASIC_PRODUCT_ID,
             title: 'Suscripción mensual turnos',
             description: 'Plan básico - 1 mes',
-            unit_price: BASIC_PRICE_ARS,
+            unit_price: basicPriceARS,
             currency_id: 'ARS',
             quantity: 1,
           },
@@ -100,6 +98,9 @@ export async function POST() {
 
     return NextResponse.json({ initPoint }, { status: 200 });
   } catch (err) {
+    if (err instanceof Error && ['BILLING_PRICE_NOT_CONFIGURED', 'PUBLIC_APP_URL_NOT_CONFIGURED', 'PUBLIC_APP_URL_INVALID'].includes(err.message)) {
+      return NextResponse.json({ error: 'BILLING_CONFIGURATION_ERROR' }, { status: 500 });
+    }
     console.error('[MP CHECKOUT] failed', {
       error: err instanceof Error ? err.name : 'unknown',
     });

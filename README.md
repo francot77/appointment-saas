@@ -16,13 +16,17 @@ Configurar al menos:
 Para pagos y URLs:
 
 - `NEXT_PUBLIC_APP_URL` (o `APP_URL`) — URL pública de la app (para back_urls)
+- `MP_BASIC_PRICE_ARS` — precio vigente del plan básico en ARS, en unidades monetarias enteras
+- `MP_ACCEPTED_PRICES_ARS` — lista explícita separada por comas de precios ARS aceptados por webhooks/reconciliación durante una transición; el precio vigente siempre se incluye
 - `MP_ACCESS_TOKEN_TEST` — token de MercadoPago (test)
 - `MP_ACCESS_TOKEN_PROD` — token de MercadoPago (producción)
 - `MP_WEBHOOK_SECRET` — secreto de firma de Webhooks de Mercado Pago, configurado en Tus Integraciones
 
 Mercado Pago firma cada webhook con `x-signature` usando HMAC-SHA256 sobre `id`, `x-request-id` y `ts`; la aplicación rechaza firmas ausentes, inválidas o con más de cinco minutos. `MP_WEBHOOK_SECRET` es obligatorio para activar el endpoint.
 
-El precio del plan básico es `10000` ARS. Mercado Pago recibe `unit_price` en unidades monetarias, no centavos; el valor se valida nuevamente en el webhook junto con `currency_id=ARS`, el producto `basic-monthly` y cantidad 1.
+El precio del plan básico se toma de `MP_BASIC_PRICE_ARS` y Mercado Pago recibe `unit_price` en unidades monetarias, no centavos. Checkout y la interfaz usan siempre el precio vigente. Webhooks y reconciliación aceptan únicamente ese precio y los valores explícitos de `MP_ACCEPTED_PRICES_ARS`; nunca aceptan importes arbitrarios. Para una prueba temporal en producción, configurar `MP_BASIC_PRICE_ARS=100` y `MP_ACCEPTED_PRICES_ARS=100,10000` durante la ventana de pagos demorados; luego restaurar `MP_BASIC_PRICE_ARS=10000` y quitar `100` de la lista cuando no queden pagos pendientes por recibir o reconciliar. Nunca reescribir registros `Payment` históricos.
+
+En producción, `NEXT_PUBLIC_APP_URL` o `APP_URL` es obligatorio y debe ser una URL pública válida; no se permite localhost. Si `MP_BASIC_PRICE_ARS` falta o es inválido en producción, el checkout falla cerrado; una lista `MP_ACCEPTED_PRICES_ARS` malformada también se rechaza. En desarrollo y test se usa 10000 ARS como valor seguro cuando la variable no está configurada.
 
 Recomendado en producción:
 

@@ -18,6 +18,18 @@ Required or production-recommended variables are listed in [`README.md`](../READ
 | `NEXTAUTH_SECRET`, `NEXTAUTH_URL` | Authenticated sessions | **Owner: assign. Action: configure and rotate procedure.** |
 | Mercado Pago variables | Checkout and signed webhook verification | **Owner: assign. Action: configure test/prod separation.** |
 | `NEXT_PUBLIC_APP_URL` or `APP_URL` | Public and provider return URLs | **Owner: assign. Action: verify production URL.** |
+| `MP_BASIC_PRICE_ARS` | Current basic-plan price in whole ARS units | **Owner: assign. Action: set `100` only for temporary production testing, then restore `10000` before commercial launch.** |
+| `MP_ACCEPTED_PRICES_ARS` | Explicit comma-separated ARS prices accepted by webhook/reconciliation during a transition | **Owner: assign. Action: include every intentional prior price, then remove it only after the delayed-payment/reconciliation window is clear.** |
+
+### Safe transition procedure
+
+1. Set `MP_BASIC_PRICE_ARS=100` for the temporary production test.
+2. Set `MP_ACCEPTED_PRICES_ARS=100,10000` so both the test price and the previous price remain valid for delayed webhooks and reconciliation. The current price is always included even if omitted from this list.
+3. After the pending-provider and reconciliation window is clear, restore `MP_BASIC_PRICE_ARS=10000` and remove `100` from `MP_ACCEPTED_PRICES_ARS` (or unset the variable if no prior price is needed).
+
+Checkout and UI use only `MP_BASIC_PRICE_ARS` as the new price. Webhooks and reconciliation accept only the current price plus explicitly listed transition prices. Never accept arbitrary provider amounts or rewrite historical `Payment` records and periods.
+
+Production checkout requires `NEXT_PUBLIC_APP_URL` or `APP_URL` to be a valid public `http`/`https` URL. The application rejects missing, invalid, or localhost production configuration before creating a preference. Never place tokens or webhook secrets in client-visible configuration or logs.
 
 CI uses repository code and dependency installation only. It does not require production secrets and must not receive them.
 

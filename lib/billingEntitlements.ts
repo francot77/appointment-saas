@@ -1,8 +1,6 @@
 import { Types } from 'mongoose';
 import { Business } from '@/lib/models/Business';
-
 export const BASIC_PRODUCT_ID = 'basic-monthly';
-export const BASIC_PRICE_ARS = 10000;
 
 type BillingBusiness = {
   _id: Types.ObjectId;

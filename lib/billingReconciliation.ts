@@ -1,7 +1,8 @@
 import { Types } from 'mongoose';
 import { Business } from '@/lib/models/Business';
 import { Payment } from '@/lib/models/Payments';
-import { BASIC_PRICE_ARS, BASIC_PRODUCT_ID } from '@/lib/billingEntitlements';
+import { BASIC_PRODUCT_ID } from '@/lib/billingEntitlements';
+import { getAcceptedBasicPricesARS } from '@/lib/billingConfig';
 
 export type ProviderPayment = {
   id?: string | number;
@@ -36,9 +37,11 @@ function normalizeStatus(status: string) {
 export function validateProviderPayment(payment: ProviderPayment, expectedBusinessId?: string) {
   const businessId = payment.external_reference;
   const item = payment.additional_info?.items?.find((candidate) => candidate.id === BASIC_PRODUCT_ID);
+  const acceptedPricesARS = getAcceptedBasicPricesARS();
   if (!isSupportedProviderStatus(payment.status) || !businessId || !Types.ObjectId.isValid(businessId) ||
       (expectedBusinessId && businessId !== expectedBusinessId) || payment.currency_id !== 'ARS' ||
-      payment.transaction_amount !== BASIC_PRICE_ARS || !item || item.unit_price !== BASIC_PRICE_ARS || item.quantity !== 1) {
+      !acceptedPricesARS.includes(payment.transaction_amount as number) || !item ||
+      !acceptedPricesARS.includes(item.unit_price as number) || item.quantity !== 1) {
     throw new Error('PAYMENT_INVALID');
   }
   return { businessId, nextStatus: normalizeStatus(payment.status as string) };

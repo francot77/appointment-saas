@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { auth } from '@/lib/auth';
 import { apiError } from '@/lib/apiError';
+import { getBasicPriceARS, getPublicAppUrl } from '@/lib/billingConfig';
 
 export const runtime = 'nodejs';
 
@@ -18,6 +19,8 @@ export async function POST() {
     }
 
     const accessToken = process.env.MP_ACCESS_TOKEN_TEST;
+    const basicPriceARS = getBasicPriceARS();
+    const appUrl = getPublicAppUrl();
 
     console.log('[MP TEST] env', {
       hasAccessToken: !!accessToken,
@@ -44,14 +47,14 @@ export async function POST() {
             title: 'TEST Suscripción mensual turnos',
             description: 'Plan básico - 1 mes',
             quantity: 1,
-            unit_price: 10000,
+             unit_price: basicPriceARS,
             currency_id: 'ARS',
           },
         ],
         back_urls: {
-          success: 'https://www.google.com',          // 👈 https, dominio real
-          failure: 'https://www.google.com',
-          pending: 'https://www.google.com',
+          success: `${appUrl}/billing?status=success`,
+          failure: `${appUrl}/billing?status=failure`,
+          pending: `${appUrl}/billing?status=pending`,
         },
         auto_return: 'approved',
         // 🔴 IMPORTANTE: por ahora SIN notification_url

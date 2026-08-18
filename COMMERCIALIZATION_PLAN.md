@@ -6,6 +6,16 @@ This roadmap moves the current MVP toward a paid, trustworthy appointment SaaS. 
 
 FezTime has public booking, authenticated business management, MongoDB persistence, NextAuth, and Mercado Pago integration. It is not launch-ready: booking is not atomic, automated tests are absent, webhook/idempotency hardening is incomplete, and operations/observability are minimal.
 
+## Billing Price Configuration
+
+`MP_BASIC_PRICE_ARS` is the server-authoritative price for new basic-plan checkout preferences and Mercado Pago validation/reconciliation.
+
+- Temporary production test: `MP_BASIC_PRICE_ARS=100`.
+- Commercial launch: restore `MP_BASIC_PRICE_ARS=10000`.
+- Production also requires `NEXT_PUBLIC_APP_URL` or `APP_URL` as a valid public URL; localhost is rejected.
+- Missing or invalid production price configuration fails checkout closed rather than selecting an implicit commercial price.
+- Price changes require coordinated provider validation/reconciliation handling. Existing payment records and old price periods must not be rewritten.
+
 ## Visual Work Unit: Editorial clara
 
 **Outcome:** Replace the landing page's generic dark treatment with a light editorial commercial surface that explains the product, shows the actual booking model, and converts without invented social proof.
@@ -16,7 +26,7 @@ FezTime has public booking, authenticated business management, MongoDB persisten
 
 - [x] Landing hierarchy is intentional at 390px and wide desktop: header, promise, product preview, trust strip, outcomes, setup steps, evidence-based proof, pricing/trial, CTA, and legal footer.
 - [x] Product preview visibly represents both public booking and the business agenda without external image dependencies.
-- [x] Spanish copy avoids fabricated metrics, named customers, testimonials, or unsupported claims; the existing known price is shown as `$10.000 ARS/mes` and the existing 14-day trial remains linked to `/register`.
+- [x] Spanish copy avoids fabricated metrics, named customers, testimonials, or unsupported claims; the effective configured basic-plan price is shown in ARS and the existing 14-day trial remains linked to `/register`.
 - [x] Header actions preserve `/demo`, `/login`, and `/register`; legal links preserve `/terms` and `/privacy`.
 - [x] Focus states, contrast, keyboard-accessible links/buttons, and no horizontal overflow are verified at mobile and desktop sizes.
 - [x] `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check` pass.
@@ -124,7 +134,7 @@ FezTime has public booking, authenticated business management, MongoDB persisten
 
 **Acceptance criteria:**
 
-- [x] Billing clearly presents the real Básico plan, `$10.000 ARS/mes`, account status, paid-through date, manual-payment model, payment history, reconciliation action, and recovery guidance without inventing invoices, refunds, or automatic renewals.
+- [x] Billing clearly presents the real Básico plan at the effective configured ARS price, account status, paid-through date, manual-payment model, payment history, reconciliation action, and recovery guidance without inventing invoices, refunds, or automatic renewals.
 - [x] Pending, failed, expired, and retry states use actionable owner language, non-color status cues, safe support guidance, and no provider payloads or secrets.
 - [x] Login and registration share the Editorial clara header/footer, responsive hierarchy, precise `Email` labels, visible login/registration paths, accessible password visibility controls, and inline loading/error/success feedback.
 - [x] Registration explains the collected information and next onboarding step while preserving the existing `/api/register` payload and `/login?registered=1` transition.
@@ -307,11 +317,11 @@ Keep tests with the behavior they verify. Do not combine billing, booking concur
 - [ ] Phase 1C has a focused test harness. No runner was added because the project has no test framework and adding one would not be lightweight or dependency-free; lint, typecheck, build, and diff checks remain the verification boundary.
 - [x] Phase 2A validates Mercado Pago `x-signature` with `MP_WEBHOOK_SECRET`, the official `id/request-id/ts` HMAC manifest, and a five-minute replay window; missing configuration fails closed.
 - [x] Phase 2A uses a unique database boundary on `Payment.mpPaymentId`, handles duplicate-key races, and stores only provider status, status detail, product, amount, currency, and billing period; raw provider payloads are not persisted.
-- [x] Phase 2A accepts only the `basic-monthly` product at `10000` ARS, validates `external_reference` as an existing business, and never trusts browser return URLs for activation.
+- [x] Phase 2A accepts only the `basic-monthly` product at the configured `MP_BASIC_PRICE_ARS` price, validates `external_reference` as an existing business, and never trusts browser return URLs for activation.
 - [x] Phase 2A applies the entitlement gate to dashboard and `/api/admin/*` operations, while billing recovery routes and public booking remain reachable after expiration.
 - [x] Phase 2A transitions `pending` to `approved` or `rejected`, activates a 30-day period only for approved payments, exposes an effective `expired` state when `paidUntil` elapses, and ignores terminal duplicate/replayed notifications. Existing duplicate `mpPaymentId` data must be deduplicated before creating the unique index in production.
 - [x] Phase 2A wraps payment transitions and entitlement mutation in one MongoDB transaction; concurrent approved payments serialize on the business document, and approved duplicate notifications repair entitlement without extending it twice. Standalone MongoDB deployments receive `503` and require a replica set or sharded cluster.
-- [ ] Phase 2A has no focused automated tests because the repository has no compatible test runner; lint, typecheck, build, and diff checks are the verification boundary.
+- [x] Phase 2A has focused configuration tests for price parsing/defaults and production public-URL failures; provider integration tests remain outside the local test boundary.
 - [x] Phase 2B exposes authenticated, business-scoped payment history with bounded pagination and reduced DTOs; billing remains reachable when entitlement is inactive.
 - [x] Phase 2B allows authenticated support recovery only for a locally known payment reference, re-fetches Mercado Pago server-side, revalidates product/amount/currency/business ownership, and applies the same idempotent transition rules as the webhook.
 - [ ] Phase 2B has no focused automated tests because the repository still has no test runner; lint, typecheck, build, and diff checks remain the verification boundary.
@@ -340,7 +350,7 @@ Dependencies flow in order: tenant/auth boundaries -> safe request contracts -> 
 | 2026-08-13 | Phase 1A | Validation correction verified | Numeric validators reject booleans and other non-number/non-string coercions; shared `#RGB`/`#RRGGBB` color validation applies to admin service POST/PATCH; `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check` pass (lint retains 3 pre-existing warnings) |
 | 2026-08-13 | Phase 1B correction | Removed stale lease race and lock cleanup gap | Transaction-scoped unique per-business/day lock covers overlap read, insert, and token-matched release, including rejected booking returns; transient/duplicate contention is safe, unsupported standalone Mongo returns `503`; the bounded limiter ignores untrusted forwarding headers by default and documents its conservative fallback; no test setup exists, so lint/typecheck/build/diff-check are the focused verification boundary |
 | 2026-08-13 | Phase 1C | Hardened sensitive logging, bounded error taxonomy, and MP test endpoint access | Webhook, checkout, MP test, and public booking logs no longer emit bodies, provider payloads, payment URLs, tokens, phone numbers, or raw exception details; `/api/mp-test` is production-denied and session-protected outside production; public booking and webhook responses retain `error` and add stable `code`; no test runner added because the dependency-free project setup has no lightweight compatible harness |
-| 2026-08-13 | Phase 2A | Added verified, idempotent payment transitions and server-side entitlements | Webhook signature verification, unique payment provider boundary, transaction-scoped payment plus entitlement updates, serialized 30-day extensions, duplicate activation repair, safe payment audit fields, `10000` ARS unit semantics, admin/dashboard entitlement gate, billing recovery access, and explicit public booking policy implemented; no test runner exists, so lint/typecheck/build/diff-check remain required |
+| 2026-08-13 | Phase 2A | Added verified, idempotent payment transitions and server-side entitlements | Webhook signature verification, unique payment provider boundary, transaction-scoped payment plus entitlement updates, serialized 30-day extensions, duplicate activation repair, safe payment audit fields, configured ARS unit semantics, admin/dashboard entitlement gate, billing recovery access, and explicit public booking policy implemented |
 | 2026-08-13 | Phase 2B | Added payment history, bounded reconciliation, and recovery UX | Authenticated business-scoped history DTOs, safe known-payment Mercado Pago refresh, shared validation/idempotency, pending/failed retry messaging, paid-through dates, and support references; no test runner exists |
 | 2026-08-13 | Phase 3 activation MVP | Added first-run activation checklist and public link sharing | `/api/admin/activation` derives state from tenant-owned services, schedules, settings, and slug; dashboard provides next actions and safe URL copy/preview; registration now transitions with a clear login confirmation; no test runner exists |
 | 2026-08-13 | Phase 4 bounded visual polish | Improved conversion, invalid-link recovery, accessible dashboard feedback, and public booking clarity | Primary landing CTAs now reach `/register`; magic-link loading has timeout and actionable invalid/expired states; Services replaces browser dialogs with an inline dialog and live feedback; booking communicates four steps and localized availability guidance; no legal claims added |
