@@ -6,6 +6,23 @@ This roadmap moves the current MVP toward a paid, trustworthy appointment SaaS. 
 
 FezTime has public booking, authenticated business management, MongoDB persistence, NextAuth, and Mercado Pago integration. It is not launch-ready: booking is not atomic, automated tests are absent, webhook/idempotency hardening is incomplete, and operations/observability are minimal.
 
+## Visual Work Unit: Editorial clara
+
+**Outcome:** Replace the landing page's generic dark treatment with a light editorial commercial surface that explains the product, shows the actual booking model, and converts without invented social proof.
+
+**Scope:** `app/page.tsx`, landing-specific rules in `app/globals.css`, and this roadmap entry only. Dashboard, settings, public booking, routes, and existing PWA/logo assets remain unchanged.
+
+**Acceptance criteria:**
+
+- [x] Landing hierarchy is intentional at 390px and wide desktop: header, promise, product preview, trust strip, outcomes, setup steps, evidence-based proof, pricing/trial, CTA, and legal footer.
+- [x] Product preview visibly represents both public booking and the business agenda without external image dependencies.
+- [x] Spanish copy avoids fabricated metrics, named customers, testimonials, or unsupported claims; the existing known price is shown as `$10.000 ARS/mes` and the existing 14-day trial remains linked to `/register`.
+- [x] Header actions preserve `/demo`, `/login`, and `/register`; legal links preserve `/terms` and `/privacy`.
+- [x] Focus states, contrast, keyboard-accessible links/buttons, and no horizontal overflow are verified at mobile and desktop sizes.
+- [x] `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check` pass.
+
+**Rollback boundary:** Remove only the landing implementation in `app/page.tsx`, landing rules appended to `app/globals.css`, and this work-unit entry. Do not revert unrelated dirty-worktree changes.
+
 ## Priority Model
 
 | Priority | Meaning | Launch rule |
@@ -168,6 +185,7 @@ Dependencies flow in order: tenant/auth boundaries -> safe request contracts -> 
 | 2026-08-13 | Phase 3 activation MVP | Added first-run activation checklist and public link sharing | `/api/admin/activation` derives state from tenant-owned services, schedules, settings, and slug; dashboard provides next actions and safe URL copy/preview; registration now transitions with a clear login confirmation; no test runner exists |
 | 2026-08-13 | Phase 4 bounded visual polish | Improved conversion, invalid-link recovery, accessible dashboard feedback, and public booking clarity | Primary landing CTAs now reach `/register`; magic-link loading has timeout and actionable invalid/expired states; Services replaces browser dialogs with an inline dialog and live feedback; booking communicates four steps and localized availability guidance; no legal claims added |
 | 2026-08-13 | Phase 5B CI, route tests, and operations runbook | Added repeatable quality gates, focused high-risk route coverage, and production operations guidance | `.github/workflows/ci.yml`; `tests/route-risk.test.ts`; `docs/OPERATIONS.md`; verification commands and `git diff --check` |
+| 2026-08-18 | Visual work unit: Editorial clara | Rebuilt the landing surface around product evidence, clear trial/pricing, and responsive editorial hierarchy | `app/page.tsx`; landing rules in `app/globals.css`; browser smoke and required verification commands |
 
 ## Next Work Units
 

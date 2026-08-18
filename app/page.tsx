@@ -1,327 +1,36 @@
-// app/page.tsx
-import Link from 'next/link';
 import Image from 'next/image';
+import Link from 'next/link';
+
+const schedule = [
+  { time: '09:30', name: 'Corte + barba', client: 'Sofía R.', tone: 'confirmed' },
+  { time: '11:00', name: 'Coloración', client: 'Marina P.', tone: 'pending' },
+  { time: '14:30', name: 'Manicuría semipermanente', client: 'Luz M.', tone: 'confirmed' },
+];
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#101622] text-slate-50 font-sans">
-      <div className="relative flex min-h-screen w-full flex-col overflow-x-hidden">
-        {/* Top App Bar */}
-        <header className="sticky top-0 z-10 flex h-16 items-center justify-between bg-[#101622]/90 px-4 backdrop-blur-sm border-b border-slate-800">
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 border border-indigo-400/30 overflow-hidden">
-              <Image
-                src="/feztime-logo.svg"
-                alt="FezTime"
-                width={36}
-                height={36}
-                priority
-              />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-lg font-bold tracking-[-0.03em]">
-                FezTime
-              </span>
-              <span className="text-[11px] text-slate-400">
-                Agenda online para barberías y estética
-              </span>
-            </div>
-          </div>
-
-          <Link
-            href="/register"
-            className="flex h-10 items-center justify-center rounded-full bg-indigo-600 px-4 text-xs font-bold text-white shadow-md shadow-indigo-600/30 hover:bg-indigo-500 transition-colors"
-          >
-            Probar Gratis
-          </Link>
-        </header>
-
-        <main className="flex-grow">
-          {/* Hero */}
-          <section className="px-4 py-10 sm:py-16">
-            <div className="mx-auto flex max-w-5xl flex-col gap-10 lg:flex-row lg:items-center">
-              <div className="flex flex-1 flex-col gap-4 text-center lg:text-left">
-                <h1 className="text-4xl font-black leading-tight tracking-[-0.045em] text-slate-50 sm:text-5xl">
-                  Organizá tu agenda
-                  <br className="hidden sm:block" /> y llená más turnos.
-                </h1>
-                <p className="mx-auto max-w-md text-sm sm:text-base font-normal leading-relaxed text-slate-400 lg:mx-0">
-                  Plataforma de turnos online pensada para manicuristas,
-                  peluqueros, barberías y centros de estética que viven a
-                  WhatsApp pero quieren dejar el cuaderno atrás.
-                </p>
-
-                <div className="mt-2 flex flex-col items-center gap-3 sm:flex-row sm:justify-start">
-                  <Link
-                    id="cta"
-                    href="/register"
-                    className="inline-flex h-11 w-full max-w-xs items-center justify-center rounded-full bg-indigo-600 px-6 text-sm font-semibold tracking-[0.03em] text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 transition-colors"
-                  >
-                    Probar gratis 14 días
-                  </Link>
-                  <p className="text-[11px] text-slate-500">
-                    Sin tarjeta. Cancelás cuando quieras.
-                  </p>
-                </div>
-
-                <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-slate-500 sm:justify-start">
-                  <div className="inline-flex items-center gap-1">
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                    <span>Sin límite de turnos</span>
-                  </div>
-                  <div className="inline-flex items-center gap-1">
-                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                    <span>Ideal para un solo local</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* "Mock" de la app */}
-              <div className="flex flex-1 items-center justify-center">
-                <div className="mx-auto w-full max-w-xs rounded-3xl border border-slate-800 bg-slate-950/80 p-3 shadow-2xl shadow-black/70">
-                  <div className="mx-auto mb-2 h-1 w-16 rounded-full bg-slate-700" />
-                  <div className="rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 p-3">
-                    {/* Encabezado móvil */}
-                    <div className="mb-3 flex items-center justify-between text-[11px] text-slate-300">
-                      <span className="font-semibold text-slate-100">
-                        Hoy · Martes 12
-                      </span>
-                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-900 px-2 py-0.5 text-[10px] text-emerald-300 border border-emerald-400/40">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                        Agenda llena
-                      </span>
-                    </div>
-
-                    {/* Mini calendario */}
-                    <div className="mb-3 grid grid-cols-7 gap-1 text-center text-[10px] text-slate-400">
-                      {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, i) => (
-                        <div
-                          key={d + i}
-                          className="flex flex-col items-center gap-0.5"
-                        >
-                          <span>{d}</span>
-                          <span
-                            className={[
-                              'flex h-6 w-6 items-center justify-center rounded-full text-[11px]',
-                              i === 1
-                                ? 'bg-indigo-600 text-white'
-                                : 'bg-slate-900 text-slate-300',
-                            ].join(' ')}
-                          >
-                            {10 + i}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Lista de turnos */}
-                    <div className="space-y-2">
-                      {[
-                        {
-                          hora: '10:00',
-                          cliente: 'Ana (uñas)',
-                          estado: 'Confirmado',
-                          color: 'bg-emerald-500/10 text-emerald-200 border-emerald-400/40',
-                        },
-                        {
-                          hora: '12:30',
-                          cliente: 'Laura (color)',
-                          estado: 'Pendiente',
-                          color: 'bg-amber-500/10 text-amber-200 border-amber-400/40',
-                        },
-                        {
-                          hora: '16:00',
-                          cliente: 'Diego (corte)',
-                          estado: 'Confirmado',
-                          color: 'bg-emerald-500/10 text-emerald-200 border-emerald-400/40',
-                        },
-                      ].map((t) => (
-                        <div
-                          key={t.hora}
-                          className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/80 px-2 py-1.5"
-                        >
-                          <div className="flex flex-col">
-                            <span className="text-[11px] text-slate-400">
-                              {t.hora} hs
-                            </span>
-                            <span className="text-xs font-medium text-slate-100">
-                              {t.cliente}
-                            </span>
-                          </div>
-                          <span
-                            className={`rounded-full border px-2 py-0.5 text-[10px] ${t.color}`}
-                          >
-                            {t.estado}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Cómo funciona */}
-          <section className="px-4 py-10 sm:py-16 border-t border-slate-800/60">
-            <div className="mx-auto flex max-w-5xl flex-col gap-8">
-              <div className="flex flex-col gap-2 text-center">
-                <h2 className="text-2xl sm:text-3xl font-bold leading-tight tracking-[-0.03em]">
-                  Cómo funciona
-                </h2>
-                <p className="mx-auto max-w-md text-sm sm:text-base text-slate-400">
-                  En pocos minutos tenés tu agenda online lista para compartir
-                  en Instagram, WhatsApp y Google.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <FeatureCard
-                  title="Tus clientes reservan solos"
-                  desc="Compartís tu link y ellos eligen día y horario sin escribirte a cada rato."
-                  icon="24/7"
-                />
-                <FeatureCard
-                  title="Recordatorios automáticos"
-                  desc="Reducí faltazos avisando antes del turno por WhatsApp o SMS."
-                  icon="🔔"
-                />
-                <FeatureCard
-                  title="Historial de clientes"
-                  desc="Quién vino, qué se hizo, cada cuánto vuelve. Todo ordenado."
-                  icon="👥"
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* Reviews */}
-          <section className="bg-slate-950/80 border-y border-slate-800 py-10 sm:py-16">
-            <div className="mx-auto max-w-4xl px-4">
-              <h2 className="pb-6 text-center text-2xl sm:text-3xl font-bold leading-tight tracking-[-0.03em]">
-                Lo que dicen quienes ya lo usan
-              </h2>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <ReviewCard
-                  nombre="Ana Pérez"
-                  rol="Manicurista"
-                  texto="Ahora mis clientas reservan solas y yo no estoy todo el día atrapada en el WhatsApp. Lleno la agenda mucho más fácil."
-                />
-                <ReviewCard
-                  nombre="Laura Gómez"
-                  rol="Peluquera"
-                  texto="Los recordatorios hicieron magia. Casi no tengo más turnos colgados sin avisar. Es como tener una recepcionista virtual."
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* CTA final */}
-          <section className="px-4 py-16 sm:py-20" id="pricing">
-            <div className="mx-auto flex max-w-xl flex-col items-center gap-4 text-center">
-              <h2 className="text-2xl sm:text-3xl font-bold leading-tight tracking-[-0.03em]">
-                ¿Listo para dejar el cuaderno y el caos de mensajes?
-              </h2>
-              <p className="mx-auto max-w-md text-sm sm:text-base text-slate-400">
-                Arrancá hoy mismo y probá FezTime en tu barbería o estética.
-                Si no te ordena la vida, lo dejás y listo.
-              </p>
-              <Link
-                href="/register"
-                className="mt-2 flex h-11 w-full max-w-xs items-center justify-center rounded-full bg-indigo-600 px-5 text-sm font-semibold tracking-[0.03em] text-white shadow-lg shadow-indigo-600/30 hover:bg-indigo-500 transition-colors"
-              >
-                Comenzar prueba gratuita
-              </Link>
-              <p className="text-[11px] text-slate-500">
-                Sin tarjeta, sin permanencia. Para barberías, peluquerías y
-                centros de estética.
-              </p>
-            </div>
-          </section>
-        </main>
-
-        <footer className="border-t border-slate-800 bg-[#0b1019] px-4 py-6">
-          <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-3 text-center text-[11px] text-slate-500 sm:flex-row sm:text-left">
-            <p>
-              © {new Date().getFullYear()} FezTime. Todos los derechos
-              reservados.
-            </p>
-            <div className="flex gap-4">
-              <Link
-                href="/terms"
-                className="hover:text-indigo-300 transition-colors"
-              >
-                Términos
-              </Link>
-              <Link
-                href="/privacy"
-                className="hover:text-indigo-300 transition-colors"
-              >
-                Privacidad
-              </Link>
-            </div>
-          </div>
-        </footer>
-      </div>
+    <div className="landing-page">
+      <header className="site-header">
+        <Link className="brand" href="/" aria-label="FezTime, inicio"><Image src="/feztime-logo.svg" alt="" width={34} height={34} priority /><span>FezTime</span></Link>
+        <nav className="header-actions" aria-label="Navegación principal"><Link className="header-demo" href="/demo">Ver demo</Link><Link className="header-login" href="/login">Ingresar</Link><Link className="button button-small" href="/register">Crear cuenta</Link></nav>
+      </header>
+      <main>
+        <section className="hero section-shell"><div className="hero-copy"><p className="eyebrow"><span className="eyebrow-dot" /> Agenda online para servicios profesionales</p><h1>Más turnos. Menos mensajes pendientes.</h1><p className="hero-lede">FezTime ordena tus reservas, horarios y clientes en un solo lugar para que tu negocio se vea tan profesional como el servicio que ofrecés.</p><div className="hero-actions"><Link className="button" id="cta" href="/register">Probar gratis 14 días <span aria-hidden="true">→</span></Link><Link className="text-link" href="#como-funciona">Conocé cómo funciona <span aria-hidden="true">↓</span></Link></div><p className="microcopy">Sin configuración complicada. Publicá tu agenda y empezá a compartirla.</p></div><ProductPreview /></section>
+        <section className="trust-strip" aria-label="Para quién es FezTime"><div className="section-shell trust-inner"><span>Una agenda clara para negocios que trabajan con turnos</span><div className="trust-items"><span>Barberías</span><span>Peluquerías</span><span>Manicuristas</span><span>Estética</span></div></div></section>
+        <section className="outcomes section-shell" id="beneficios"><div className="section-intro"><p className="eyebrow">El trabajo de todos los días</p><h2>Tu negocio, con espacio para crecer.</h2><p>La agenda no debería ser otro problema que resolver. FezTime reúne lo esencial para trabajar con más orden y transmitir confianza desde el primer contacto.</p></div><div className="outcome-grid"><Outcome number="01" title="Reservas sin ida y vuelta" text="Compartí un link y dejá que tus clientes elijan un servicio, un día y un horario disponible." /><Outcome number="02" title="Una vista para tu día" text="Consultá tu agenda y el estado de cada turno sin buscar conversaciones viejas." /><Outcome number="03" title="Una experiencia más profesional" text="Tu negocio tiene un espacio propio para recibir reservas, con horarios y servicios claros." /></div></section>
+        <section className="steps-section" id="como-funciona"><div className="section-shell"><div className="section-intro"><p className="eyebrow">Empezá en minutos</p><h2>De la agenda desordenada a un link compartible.</h2></div><div className="steps-grid"><Step number="1" title="Creá tu cuenta" text="Registrate y completá los datos básicos de tu negocio." /><Step number="2" title="Cargá tu propuesta" text="Definí tus servicios, duración y horarios de atención." /><Step number="3" title="Compartí tu agenda" text="Publicá tu link en WhatsApp, Instagram o donde te encuentren." /></div></div></section>
+        <section className="proof section-shell"><div className="proof-card"><div><p className="eyebrow">Hecho para mostrar el trabajo real</p><h2>La primera impresión también se agenda.</h2><p>Sin promesas infladas ni métricas de catálogo. FezTime te da una experiencia de reserva concreta, fácil de entender y lista para compartir.</p></div><Link className="text-link light-link" href="/demo">Explorar la demo <span aria-hidden="true">→</span></Link></div></section>
+        <section className="pricing section-shell" id="pricing"><div className="pricing-copy"><p className="eyebrow">Prueba y precio claros</p><h2>Probalo con tu negocio antes de decidir.</h2><p>Empezá con 14 días de prueba. Si decidís continuar, el plan básico cuesta <strong>$10.000 ARS por mes</strong>.</p></div><div className="price-card"><p className="price-label">Plan básico</p><p className="price"><span>$10.000</span> ARS <small>/ mes</small></p><p className="price-note">Después de tu prueba de 14 días</p><ul><li>Agenda online para compartir</li><li>Servicios y horarios configurables</li><li>Gestión de turnos y clientes</li></ul><Link className="button button-wide" href="/register">Empezar prueba gratuita <span aria-hidden="true">→</span></Link></div></section>
+        <section className="final-cta section-shell"><p className="eyebrow">Tu próximo turno empieza acá</p><h2>Ordená tu agenda. Atendé mejor.</h2><p>FezTime te ayuda a convertir consultas en reservas sin sumar trabajo administrativo.</p><Link className="button" href="/register">Crear mi agenda <span aria-hidden="true">→</span></Link></section>
+      </main>
+      <footer className="site-footer"><div className="section-shell footer-inner"><div><Link className="brand" href="/"><Image src="/feztime-logo.svg" alt="" width={28} height={28} /><span>FezTime</span></Link><p>Agenda online para negocios de servicios.</p></div><div className="footer-links"><Link href="/terms">Términos</Link><Link href="/privacy">Privacidad</Link><Link href="/login">Ingresar</Link></div><p className="copyright">© {new Date().getFullYear()} FezTime.</p></div></footer>
     </div>
   );
 }
 
-type FeatureCardProps = {
-  title: string;
-  desc: string;
-  icon: string;
-};
-
-function FeatureCard({ title, desc, icon }: FeatureCardProps) {
-  return (
-    <div className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-950/80 p-4">
-      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10 border border-indigo-400/30 text-indigo-200 text-xs">
-        {icon}
-      </div>
-      <div className="flex flex-col gap-1">
-        <h3 className="text-sm font-bold leading-tight text-slate-50">
-          {title}
-        </h3>
-        <p className="text-[11px] sm:text-sm leading-relaxed text-slate-400">
-          {desc}
-        </p>
-      </div>
-    </div>
-  );
+function ProductPreview() {
+  return <div className="product-preview" aria-label="Vista previa de la agenda pública y la agenda del negocio"><div className="preview-topline"><span className="preview-dot" /> Vista previa del producto <span>feztime.app/tu-negocio</span></div><div className="preview-panels"><div className="booking-panel"><div className="mini-brand"><span className="mini-mark">F</span><span>Estudio Norte</span></div><p className="preview-kicker">Reservá tu turno</p><h3>Elegí un servicio</h3><div className="service-choice active"><span><strong>Corte + barba</strong><small>45 min</small></span><b>$8.000</b></div><div className="service-choice"><span><strong>Coloración</strong><small>90 min</small></span><b>$15.000</b></div><div className="date-row"><span>‹</span><strong>JULIO 2026</strong><span>›</span></div><div className="days"><span>L<br /><b>20</b></span><span className="selected">M<br /><b>21</b></span><span>X<br /><b>22</b></span><span>J<br /><b>23</b></span><span>V<br /><b>24</b></span></div><div className="time-row"><span>09:30</span><span>11:00</span><span>14:30</span></div><span className="preview-button" aria-hidden="true">Continuar</span></div><div className="agenda-panel"><div className="agenda-heading"><div><small>MIÉRCOLES 22 DE JULIO</small><h3>Agenda del día</h3></div><span className="agenda-add">+</span></div>{schedule.map((item) => <div className="agenda-line" key={item.time}><span>{item.time}</span><div className={`appointment ${item.tone}`}><strong>{item.time} · {item.client}</strong><small>{item.name} · {item.tone === 'confirmed' ? 'Confirmado' : 'Pendiente'}</small></div></div>)}</div></div></div>;
 }
 
-type ReviewCardProps = {
-  nombre: string;
-  rol: string;
-  texto: string;
-};
-
-function ReviewCard({ nombre, rol, texto }: ReviewCardProps) {
-  return (
-    <div className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-950/80 p-4">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-800 text-xs font-semibold text-slate-200">
-          {nombre
-            .split(' ')
-            .map((n) => n[0])
-            .join('')
-            .slice(0, 2)}
-        </div>
-        <div className="flex-1">
-          <p className="text-sm font-medium leading-normal text-slate-50">
-            {nombre}
-          </p>
-          <p className="text-[11px] leading-normal text-slate-400">{rol}</p>
-        </div>
-      </div>
-      <div className="flex gap-0.5 text-yellow-400 text-sm">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <span key={i}>★</span>
-        ))}
-      </div>
-      <p className="text-sm leading-relaxed text-slate-200">{texto}</p>
-    </div>
-  );
-}
+function Outcome({ number, title, text }: { number: string; title: string; text: string }) { return <article className="outcome"><span className="outcome-number">{number}</span><h3>{title}</h3><p>{text}</p></article>; }
+function Step({ number, title, text }: { number: string; title: string; text: string }) { return <article className="step"><span className="step-number">{number}</span><div><h3>{title}</h3><p>{text}</p></div></article>; }
