@@ -31,6 +31,25 @@ FezTime has public booking, authenticated business management, MongoDB persisten
 | P1 | Material conversion, trust, or support risk | Complete before broad launch; can follow a private pilot |
 | P2 | Scale, polish, or expansion | Post-launch unless evidence promotes it |
 
+## Visual Work Unit: Settings UX
+
+**Outcome:** Make business settings understandable and actionable for owners, without changing the existing settings or slug API contracts.
+
+**Scope:** `app/dashboard/SettingsTab.tsx` and this roadmap entry only. No uploads, schema changes, new dependencies, or backend contract changes.
+
+**Acceptance criteria:**
+
+- [ ] Settings are grouped into Public page, Appearance, About & contact, Sharing/public URL, and Advanced only where necessary, using owner-oriented Spanish copy.
+- [ ] The top summary communicates setup status and provides preview, open, and copy actions using the existing safe public slug.
+- [ ] The public URL is isolated in a warning card that explains shared links may stop working after a change; existing URL validation and save behavior remain intact.
+- [ ] The settings save action visibly communicates unsaved, saving, saved, and error states without duplicating persistence logic.
+- [ ] Theme presets appear before advanced color/background URL controls, which remain available behind a disclosure and preserve all existing API fields.
+- [ ] Form labels, helper text, focus states, ARIA semantics, and responsive layout are usable at mobile and desktop widths without introducing a broad dashboard redesign.
+- [ ] A modest public-page preview affordance exists; a full visual editor and uploads remain out of scope.
+- [ ] `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check` pass.
+
+**Rollback boundary:** Remove only the Settings UX implementation in `app/dashboard/SettingsTab.tsx` and this roadmap entry. Preserve all unrelated dirty-worktree changes and existing API behavior.
+
 ## Execution Path
 
 ### Baseline and Stabilization
