@@ -1,7 +1,6 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import ServiceWorkerRegister from './ServiceWorkerRegister';
-import { Analytics } from '@vercel/analytics/next';
 
 const siteUrl = 'https://feztime.app';
 
@@ -47,7 +46,6 @@ export default function RootLayout({
   return (
     <html lang="es">
       <head>
-        <Analytics />
         <ServiceWorkerRegister />
       </head>
       <body>{children}</body>

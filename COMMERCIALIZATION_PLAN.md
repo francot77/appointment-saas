@@ -31,6 +31,20 @@ FezTime has public booking, authenticated business management, MongoDB persisten
 | P1 | Material conversion, trust, or support risk | Complete before broad launch; can follow a private pilot |
 | P2 | Scale, polish, or expansion | Post-launch unless evidence promotes it |
 
+## Visual QA Fixes After `002878f`
+
+**Outcome:** Remove the verified final visual-QA blockers without changing tenant booking routes or inventing deployment configuration.
+
+- [x] Direct `/turnos` navigation redirects only when `NEXT_PUBLIC_DEFAULT_SLUG` or `DEFAULT_SLUG` is explicitly configured; otherwise it renders a helpful chooser instead of using a fake business slug or failing during server rendering.
+- [x] Removed the unconfigured Vercel Analytics component from `app/layout.tsx`, eliminating the persistent `/_vercel/insights/script.js` 404 without adding deployment configuration.
+- [x] Verified the landing header CTA uses `/register` and preserves `/demo` and `/login`; lower conversion CTAs continue to use `/register`.
+- [x] Invalid magic links retain their user-visible expired/invalid recovery state. Their expected appointment lookup can still appear as a 404 network entry; it was not hidden or relabeled because that would risk masking real API failures.
+- [x] `/:slug/turnos` booking routes remain unchanged.
+
+**Remaining known limitations:** A generic `/turnos` URL cannot select a business without an explicit deployment default or a tenant slug in the shared link. Invalid magic-link requests still return a semantically correct 404 in the API and may be visible in browser network diagnostics.
+
+**Rollback boundary:** Remove only `app/turnos/page.tsx`, the analytics import/render removal in `app/layout.tsx`, and this QA entry. Preserve all unrelated dirty-worktree changes.
+
 ## Visual Work Unit: Public business page
 
 **Outcome:** Turn a shared business link into a credible branded booking page instead of a link-in-bio list, while keeping tenant content and capabilities honest.
