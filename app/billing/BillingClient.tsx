@@ -5,15 +5,23 @@ import { useEffect, useMemo, useState } from 'react';
 type BillingInfo = { planName: string; status: string; statusCode: string; paidUntil: string | null; priceARS: number; billingMode?: 'manual' | 'auto' | null };
 type Payment = { id: string; status: 'approved' | 'pending' | 'rejected'; createdAt: string; amount: number; currency: string; providerReference: string; paidThrough: string };
 
+function billingError(action: 'history' | 'reconcile' | 'checkout') {
+  return action === 'history'
+    ? 'No pudimos cargar el historial de pagos. Intentá nuevamente.'
+    : action === 'reconcile'
+      ? 'No pudimos verificar este pago. Intentá nuevamente o contactá soporte con la referencia.'
+      : 'No pudimos iniciar el pago. Intentá nuevamente.';
+}
+
 export default function BillingClient({ billingInfo }: { billingInfo: BillingInfo }) {
   const [manualLoading, setManualLoading] = useState(false); const [error, setError] = useState<string | null>(null); const [payments, setPayments] = useState<Payment[]>([]); const [historyLoading, setHistoryLoading] = useState(true); const [reconciling, setReconciling] = useState<string | null>(null);
-  async function loadHistory() { setHistoryLoading(true); try { const res = await fetch('/api/billing/history?limit=20'); const data = await res.json(); if (!res.ok) throw new Error(data.error || 'No se pudo cargar el historial'); setPayments(data.payments || []); } catch (err) { setError(err instanceof Error ? err.message : 'No se pudo cargar el historial'); } finally { setHistoryLoading(false); } }
+  async function loadHistory() { setHistoryLoading(true); try { const res = await fetch('/api/billing/history?limit=20'); const data = await res.json(); if (!res.ok) throw new Error(data.error || 'history'); setPayments(data.payments || []); } catch (err) { console.error(err); setError(billingError('history')); } finally { setHistoryLoading(false); } }
   useEffect(() => { void loadHistory(); }, []);
-  async function reconcile(paymentId: string) { setReconciling(paymentId); setError(null); try { const res = await fetch('/api/billing/reconcile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentId }) }); const data = await res.json(); if (!res.ok) throw new Error(data.error || 'No se pudo actualizar el pago'); await loadHistory(); } catch (err) { setError(err instanceof Error ? err.message : 'No se pudo actualizar el pago'); } finally { setReconciling(null); } }
+  async function reconcile(paymentId: string) { setReconciling(paymentId); setError(null); try { const res = await fetch('/api/billing/reconcile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentId }) }); const data = await res.json(); if (!res.ok) throw new Error(data.error || 'reconcile'); await loadHistory(); } catch (err) { console.error(err); setError(billingError('reconcile')); } finally { setReconciling(null); } }
   const paidUntilLabel = useMemo(() => billingInfo.paidUntil ? new Date(billingInfo.paidUntil).toLocaleDateString('es-AR') : 'Sin pagos registrados', [billingInfo.paidUntil]);
   const isActive = billingInfo.statusCode === 'active' || billingInfo.statusCode === 'trial';
   const statusDescription = isActive ? 'El panel está disponible.' : billingInfo.statusCode === 'past_due' ? 'El acceso operativo está pausado. Podés recuperar el plan desde acá.' : billingInfo.statusCode === 'expired' ? 'Acceso vencido. Renovalo desde acá para recuperar el panel.' : 'La facturación sigue disponible para revisar o recuperar el acceso.';
-  async function handleManualPay() { setManualLoading(true); setError(null); try { const res = await fetch('/api/billing/mp/checkout', { method: 'POST' }); if (!res.ok) throw new Error('No se pudo crear el pago'); const data = await res.json(); if (!data.initPoint) throw new Error('No se recibió el link de pago'); window.location.href = data.initPoint; } catch (err) { setError(err instanceof Error ? err.message : 'No se pudo iniciar el pago.'); setManualLoading(false); } }
+  async function handleManualPay() { setManualLoading(true); setError(null); try { const res = await fetch('/api/billing/mp/checkout', { method: 'POST' }); if (!res.ok) throw new Error('checkout'); const data = await res.json(); if (!data.initPoint) throw new Error('missing payment link'); window.location.href = data.initPoint; } catch (err) { console.error(err); setError(billingError('checkout')); setManualLoading(false); } }
 
   return <div className="space-y-6">
     <section className="grid gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_16px_50px_rgba(15,23,42,0.07)] sm:grid-cols-[1fr_auto] sm:p-8">

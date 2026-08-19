@@ -117,7 +117,7 @@ export default function DashboardClient({ businessName, businessSlug, avatarUrl,
       <div className="mx-auto flex min-h-screen w-full max-w-[1500px]">
         <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200/80 bg-[#faf9f6] px-5 py-6 lg:flex">
           <BrandMark avatarUrl={avatarUrl} businessName={businessName} initial={initial} theme={theme} />
-          <p className="mt-12 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Espacio de trabajo</p>
+          <p className="mt-12 px-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Tu negocio</p>
           <nav aria-label="Navegación principal" className="mt-3 space-y-1">
             {NAV_ITEMS.map((item) => <NavItem key={item.key} item={item} active={tab === item.key} onClick={() => goTo(item.key)} theme={theme} />)}
           </nav>

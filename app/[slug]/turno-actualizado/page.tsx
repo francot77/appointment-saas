@@ -49,7 +49,6 @@ export default async function TurnoActualizadoPage(props: Props) {
 
   return (
     <main className="min-h-screen relative bg-slate-950 text-slate-100 flex items-center justify-center px-4">
-      {/* Glow de fondo */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
           className="absolute -top-32 -left-24 w-72 h-72 rounded-full opacity-35 blur-3xl"
@@ -63,7 +62,6 @@ export default async function TurnoActualizadoPage(props: Props) {
 
       <div className="relative z-10 w-full max-w-md">
         <section className="bg-slate-950/80 border border-slate-800 rounded-2xl px-5 py-6 shadow-2xl shadow-black/60 backdrop-blur space-y-4">
-          {/* Header negocio */}
           <header className="flex items-center gap-3">
             <div
               className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shadow-lg shadow-black/40"
@@ -81,18 +79,16 @@ export default async function TurnoActualizadoPage(props: Props) {
             </div>
           </header>
 
-          {/* Mensaje principal */}
           <div className="space-y-2 mt-2">
             <h2 className="text-lg font-semibold">
               ¡Tu turno fue reprogramado! 🔁
             </h2>
             <p className="text-xs text-slate-300">
-              Actualizamos tu turno con el nuevo horario que elegiste. 
+              Actualizamos tu turno con el nuevo horario que elegiste.
               Te va a llegar la confirmación final por WhatsApp si el negocio lo usa para avisos.
             </p>
           </div>
 
-          {/* Resumen antes / después */}
           {(newDate || newTime || service) && (
             <div className="mt-2 border border-slate-800 rounded-lg p-3 bg-slate-950/80 text-xs space-y-2">
               <p className="text-[11px] text-slate-400">

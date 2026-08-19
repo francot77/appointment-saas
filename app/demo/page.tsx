@@ -90,7 +90,7 @@ export default function DemoPage() {
             </div>
           </div>
         </div>
-        <p className="mt-5 max-w-3xl text-sm leading-6 text-[#617083]">La demo explica conceptos y pantallas. Para publicar una agenda real, creá tu cuenta; para volver a tu espacio existente, ingresá.</p>
+         <p className="mt-5 max-w-3xl text-sm leading-6 text-[#617083]">Datos de ejemplo; no crea reservas ni guarda cambios.</p>
       </section>
     </main>
   );

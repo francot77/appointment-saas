@@ -106,14 +106,15 @@ export default function CalendarTab({ brand }: CalendarTabProps) {
       const json = await res.json();
 
       if (!res.ok) {
-        setError(json.error || 'Error cargando turnos de la semana');
+        console.error('Failed to load week appointments', { status: res.status, error: json.error });
+        setError('No pudimos cargar los turnos de la semana. Revisá la conexión e intentá de nuevo.');
         setAppointments([]);
       } else {
         setAppointments(json.appointments || []);
       }
     } catch (e) {
       console.error(e);
-      setError('Error cargando turnos de la semana');
+      setError('No pudimos cargar los turnos de la semana. Revisá la conexión e intentá de nuevo.');
       setAppointments([]);
     } finally {
       setLoading(false);
@@ -127,16 +128,15 @@ export default function CalendarTab({ brand }: CalendarTabProps) {
       const res = await fetch('/api/admin/schedule');
       const json = await res.json();
       if (!res.ok) {
-        const message = json.error || 'Error cargando horarios';
-        console.error(message);
-        setScheduleError(message);
+        console.error('Failed to load schedule', { status: res.status, error: json.error });
+        setScheduleError('No pudimos cargar tus horarios. Revisá la conexión e intentá de nuevo.');
         setScheduleDays([]);
       } else {
         setScheduleDays(json.days || []);
       }
     } catch (e) {
       console.error(e);
-      setScheduleError('No se pudieron cargar los horarios del negocio.');
+      setScheduleError('No pudimos cargar tus horarios. Revisá la conexión e intentá de nuevo.');
       setScheduleDays([]);
     } finally {
       setLoadingSchedule(false);
@@ -191,7 +191,7 @@ export default function CalendarTab({ brand }: CalendarTabProps) {
                   : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
-              Vista admin
+              Vista de gestión
             </button>
             <button
               type="button"
@@ -763,7 +763,7 @@ function ShareWeekCalendar({
             Agenda semanal para compartir
           </h2>
           <p className="text-sm text-slate-500">
-            Muestra sólo horarios libres / ocupados (sin nombres).
+             Consultá los horarios libres y ocupados sin mostrar nombres.
           </p>
         </div>
 

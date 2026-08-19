@@ -60,6 +60,23 @@ FezTime has public booking, authenticated business management, MongoDB persisten
 | P1 | Material conversion, trust, or support risk | Complete before broad launch; can follow a private pilot |
 | P2 | Scale, polish, or expansion | Post-launch unless evidence promotes it |
 
+## Copy Cleanup Work Unit
+
+**Outcome:** Replace developer-oriented and internal status wording in visible owner/customer surfaces with clear Spanish copy, without changing identifiers, API contracts, logs, or technical documentation.
+
+**Scope:** Visible copy in dashboard, public customer links, demo, billing, landing, terms, privacy, and this roadmap entry only.
+
+**Launch blocker:** Terms and privacy remain explicitly pending legal completion and must not be presented as final policy before launch.
+
+**Acceptance criteria:**
+
+- [x] Visible implementation notes, raw provider/API errors, internal statuses, and developer jargon are removed or mapped to owner/customer language.
+- [x] Demo keeps the simulation disclaimer and clearly states that example data does not create bookings or save changes.
+- [x] URL changes continue to warn that previously shared links may stop working.
+- [x] No API response shape, internal name, error code, log, or technical documentation was changed.
+
+**Rollback boundary:** Remove only the copy changes in the scoped UI files and this roadmap entry. Preserve all unrelated dirty-worktree changes and runtime behavior.
+
 ## Visual QA Fixes After `002878f`
 
 **Outcome:** Remove the verified final visual-QA blockers without changing tenant booking routes or inventing deployment configuration.

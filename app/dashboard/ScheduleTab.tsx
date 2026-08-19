@@ -63,7 +63,8 @@ export default function ScheduleTab({ brand }: { brand?: BrandConfig }) {
       const response = await fetch('/api/admin/schedule');
       const json = await response.json();
       if (!response.ok) {
-        setErrorSchedule(json.error || 'No pudimos cargar tus horarios.');
+        console.error('GET /api/admin/schedule failed', { status: response.status, code: json.code, error: json.error });
+        setErrorSchedule('No pudimos cargar tus horarios. Revisá la conexión e intentá de nuevo.');
         setScheduleDays([]);
       } else {
         setScheduleDays(json.days || []);
@@ -126,7 +127,8 @@ export default function ScheduleTab({ brand }: { brand?: BrandConfig }) {
       });
       const data = await response.json();
       if (!response.ok) {
-        setErrorSchedule(data.error || 'No pudimos guardar este día.');
+        console.error('PUT /api/admin/schedule failed', { status: response.status, code: data.code, error: data.error });
+        setErrorSchedule('No pudimos guardar este día. Revisá los horarios e intentá de nuevo.');
         return;
       }
       setScheduleDays((current) => current.map((item) => item.weekday === day.weekday ? data : item));
@@ -214,7 +216,7 @@ export default function ScheduleTab({ brand }: { brand?: BrandConfig }) {
           </article>;
         })}
       </div>
-      <p className="text-sm text-slate-500">Las excepciones, feriados y cierres por fecha todavía no están disponibles; se podrán sumar como una capacidad futura.</p>
+       <p className="text-sm text-slate-500">Todavía no podés definir feriados ni cierres para fechas puntuales. Por ahora, la disponibilidad se configura por día de la semana.</p>
     </section>
   );
 }

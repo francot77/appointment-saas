@@ -53,7 +53,6 @@ export default function ServicesTab({ brand }: Props) {
     setLoading(true);
     setError(null);
     try {
-      // AJUSTÁ ESTE ENDPOINT A TU API REAL
       const res = await fetch('/api/admin/services');
       const json = await res.json();
 
@@ -370,7 +369,7 @@ export default function ServicesTab({ brand }: Props) {
 
         {services.length === 0 && !loading && !error && (
           <p className="text-[11px] text-slate-400">
-            Todavía no cargaste servicios.
+             Todavía no agregaste servicios. Creá el primero para que tus clientes puedan elegirlo.
           </p>
         )}
 

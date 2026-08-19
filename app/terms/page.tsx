@@ -19,31 +19,11 @@ export default function TermsPage() {
           <h1 className="text-2xl sm:text-3xl font-bold tracking-[-0.04em]">
             Términos de {BRAND_NAME}
           </h1>
-          <p className="text-sm text-slate-400 leading-relaxed">
-            Este texto es un placeholder para que el enlace no termine en una
-            página inexistente. Reemplazalo por tus términos legales.
-          </p>
+          <p className="text-sm text-slate-400 leading-relaxed">Contenido legal pendiente de completar antes del lanzamiento.</p>
         </header>
 
-        <section className="rounded-2xl border border-slate-800 bg-slate-950/80 p-5 space-y-3 text-sm leading-relaxed text-slate-200">
-          <h2 className="text-base font-semibold">1. Uso del servicio</h2>
-          <p>
-            {BRAND_NAME} permite gestionar y solicitar turnos online. El uso del
-            servicio está sujeto al cumplimiento de las leyes aplicables y a las
-            políticas del negocio que ofrece los turnos.
-          </p>
-
-          <h2 className="text-base font-semibold">2. Disponibilidad</h2>
-          <p>
-            La disponibilidad de horarios depende de la configuración de cada
-            negocio. Los turnos solicitados pueden requerir confirmación.
-          </p>
-
-          <h2 className="text-base font-semibold">3. Contacto</h2>
-          <p>
-            Para consultas legales o soporte, definí un canal de contacto y
-            publicalo acá.
-          </p>
+        <section className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-5 text-sm leading-relaxed text-slate-200">
+          <p>Estos términos estarán disponibles antes del lanzamiento. Hasta entonces, no consideres esta página como un texto legal final.</p>
         </section>
       </div>
     </main>

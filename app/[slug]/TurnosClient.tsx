@@ -45,6 +45,19 @@ type Props = {
 
 const INK = '#18212b';
 
+function publicErrorMessage(status: number, code: string | undefined, action: 'availability' | 'request') {
+  if (status === 404 || code === 'NOT_FOUND') return 'No encontramos este negocio o servicio. Volvé a la página anterior e intentá de nuevo.';
+  if (status === 409 || code === 'CONFLICT') return action === 'availability'
+    ? 'Ese horario cambió y ya no está disponible. Elegí otra fecha.'
+    : 'Ese horario ya no está disponible. Elegí otro para enviar la solicitud.';
+  if (status === 400 || code === 'VALIDATION') return action === 'availability'
+    ? 'Revisá la fecha y el servicio elegidos.'
+    : 'Revisá tus datos y el horario elegido antes de continuar.';
+  return action === 'availability'
+    ? 'No pudimos consultar los horarios. Revisá tu conexión e intentá de nuevo.'
+    : 'No pudimos enviar la solicitud. Revisá tu conexión e intentá de nuevo.';
+}
+
 function validHex(value: string | undefined, fallback: string) {
   return value && /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(value) ? value : fallback;
 }
@@ -144,7 +157,8 @@ export default function TurnosClient({ slug, businessName, services, settings }:
       const json = await res.json();
       if (requestId !== availabilityRequest.current) return;
       if (!res.ok) {
-        setAvailabilityError(json.error || 'No pudimos consultar los horarios.');
+        console.error('GET public availability failed', { status: res.status, code: json.code, error: json.error });
+        setAvailabilityError(publicErrorMessage(res.status, json.code, 'availability'));
         return;
       }
       setSlots(Array.isArray(json.slots) ? json.slots : []);
@@ -203,7 +217,8 @@ export default function TurnosClient({ slug, businessName, services, settings }:
       });
       const json = await res.json();
       if (!res.ok) {
-        setSubmitError(json.error || 'No pudimos enviar la solicitud. Intentá de nuevo.');
+        console.error('POST public appointment failed', { status: res.status, code: json.code, error: json.error });
+        setSubmitError(publicErrorMessage(res.status, json.code, 'request'));
         return;
       }
 

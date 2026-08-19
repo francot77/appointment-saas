@@ -26,6 +26,18 @@ type Settings = {
   address: string;
 };
 
+function settingsErrorMessage(action: 'load' | 'save') {
+  return action === 'load'
+    ? 'No pudimos cargar la configuración. Revisá la conexión e intentá de nuevo.'
+    : 'No pudimos guardar la configuración. Revisá los datos e intentá de nuevo.';
+}
+
+function slugErrorMessage(status: number, code?: string) {
+  if (code === 'CONFLICT' || status === 409) return 'Esa dirección ya está en uso. Elegí otra.';
+  if (code === 'VALIDATION' || status === 400) return 'Usá una dirección con letras, números y guiones.';
+  return 'No pudimos revisar esta dirección. Intentá nuevamente.';
+}
+
 export default function SettingsTab() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(false);
@@ -59,7 +71,8 @@ export default function SettingsTab() {
       const res = await fetch('/api/admin/settings');
       const json = await res.json();
       if (!res.ok) {
-        setError(json.error || 'Error cargando configuración');
+        console.error('GET /api/admin/settings failed', { status: res.status, code: json.code, error: json.error });
+        setError(settingsErrorMessage('load'));
         setSettings(null);
       } else {
         setSettings(json.settings);
@@ -80,7 +93,8 @@ export default function SettingsTab() {
       const res = await fetch('/api/admin/slug');
       const json = await res.json();
       if (!res.ok) {
-        setSlugError(json.error || 'Error cargando el slug');
+        console.error('GET /api/admin/slug failed', { status: res.status, code: json.code, error: json.error });
+        setSlugError('No pudimos cargar tu dirección pública. Intentá nuevamente.');
         return;
       }
       setSlug(String(json.slug || ''));
@@ -88,7 +102,7 @@ export default function SettingsTab() {
       setSlugCheck({ available: true, slug: String(json.slug || ''), code: 'OWN' });
     } catch (e) {
       console.error(e);
-      setSlugError('Error cargando el slug');
+      setSlugError('No pudimos cargar tu dirección pública. Intentá nuevamente.');
     }
   }
 
@@ -112,11 +126,16 @@ export default function SettingsTab() {
         const res = await fetch(`/api/admin/slug?slug=${encodeURIComponent(value)}`);
         const json = await res.json();
         if (cancelled) return;
-        setSlugCheck(json);
+        if (!res.ok) {
+          console.error('GET /api/admin/slug availability failed', { status: res.status, code: json.code, error: json.error });
+          setSlugCheck({ available: false, error: slugErrorMessage(res.status, json.code), code: json.code });
+        } else {
+          setSlugCheck(json);
+        }
       } catch (e) {
         if (cancelled) return;
         console.error(e);
-        setSlugCheck({ available: false, error: 'Error validando slug', code: 'NETWORK' });
+        setSlugCheck({ available: false, error: 'No pudimos revisar esta dirección. Intentá nuevamente.', code: 'NETWORK' });
       } finally {
         if (!cancelled) setSlugChecking(false);
       }
@@ -141,7 +160,8 @@ export default function SettingsTab() {
       });
       const json = await res.json();
       if (!res.ok) {
-        setSlugError(json.error || 'No se pudo actualizar el slug');
+        console.error('PATCH /api/admin/slug failed', { status: res.status, code: json.code, error: json.error });
+        setSlugError(slugErrorMessage(res.status, json.code));
         return;
       }
 
@@ -152,7 +172,7 @@ export default function SettingsTab() {
       setSlugSavedMsg('URL actualizada.');
     } catch (e) {
       console.error(e);
-      setSlugError('No se pudo actualizar el slug');
+      setSlugError('No pudimos actualizar tu dirección pública. Intentá nuevamente.');
     } finally {
       setSlugSaving(false);
     }
@@ -174,7 +194,8 @@ export default function SettingsTab() {
       });
       const json = await res.json();
       if (!res.ok) {
-        setError(json.error || 'Error guardando configuración');
+        console.error('PUT /api/admin/settings failed', { status: res.status, code: json.code, error: json.error });
+        setError(settingsErrorMessage('save'));
         setSaveState('error');
         return;
       }
@@ -293,7 +314,7 @@ export default function SettingsTab() {
             <div className="mt-5"><span className="text-sm font-medium text-slate-300">Fondo de la página</span><div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Tipo de fondo">{(['solid', 'gradient', 'image'] as const).map((t) => <button key={t} type="button" onClick={() => update('backgroundType', t)} aria-pressed={settings.backgroundType === t} className={`rounded-full border px-3 py-2 text-sm ${settings.backgroundType === t ? 'border-slate-300 bg-slate-100 text-slate-900' : 'border-slate-700 text-slate-300'}`}>{t === 'solid' ? 'Color liso' : t === 'gradient' ? 'Degradado' : 'Imagen'}</button>)}</div></div>
             {settings.backgroundType === 'solid' && <div className="mt-4"><label htmlFor="backgroundColor" className="text-sm text-slate-300">Color de fondo</label><div className="mt-2 flex gap-2"><input type="color" value={settings.backgroundColor} onChange={(e) => update('backgroundColor', e.target.value)} className="h-10 w-12 rounded border border-slate-700 bg-slate-950" aria-label="Color de fondo, selector visual" /><input id="backgroundColor" value={settings.backgroundColor} onChange={(e) => update('backgroundColor', e.target.value)} className={fieldClass} /></div></div>}
             {settings.backgroundType === 'gradient' && <div className="mt-4 grid gap-4 sm:grid-cols-2"><div><label htmlFor="gradientFrom" className="text-sm text-slate-300">Inicio del degradado</label><input id="gradientFrom" value={settings.gradientFrom} onChange={(e) => update('gradientFrom', e.target.value)} className={`${fieldClass} mt-2`} /></div><div><label htmlFor="gradientTo" className="text-sm text-slate-300">Final del degradado</label><input id="gradientTo" value={settings.gradientTo} onChange={(e) => update('gradientTo', e.target.value)} className={`${fieldClass} mt-2`} /></div></div>}
-            {settings.backgroundType === 'image' && <div className="mt-4"><label htmlFor="backgroundImageUrl" className="text-sm text-slate-300">Dirección de la imagen de fondo</label><input id="backgroundImageUrl" value={settings.backgroundImageUrl} onChange={(e) => update('backgroundImageUrl', e.target.value)} placeholder="https://..." className={`${fieldClass} mt-2`} /><p className="mt-1 text-sm text-slate-500">Pegá una URL existente. Para subir archivos, usá una herramienta de almacenamiento de imágenes.</p></div>}
+            {settings.backgroundType === 'image' && <div className="mt-4"><label htmlFor="backgroundImageUrl" className="text-sm text-slate-300">Dirección de la imagen de fondo</label><input id="backgroundImageUrl" value={settings.backgroundImageUrl} onChange={(e) => update('backgroundImageUrl', e.target.value)} placeholder="https://..." className={`${fieldClass} mt-2`} /><p className="mt-1 text-sm text-slate-500">Pegá la dirección de una imagen que ya esté publicada.</p></div>}
             <div className="mt-4"><label htmlFor="logoUrl" className="text-sm text-slate-300">Dirección de tu logo (opcional)</label><input id="logoUrl" value={settings.logoUrl} onChange={(e) => update('logoUrl', e.target.value)} placeholder="https://..." className={`${fieldClass} mt-2`} /></div>
           </details>
         </section>
@@ -310,7 +331,7 @@ export default function SettingsTab() {
           <label htmlFor="slug" className="text-sm font-medium text-slate-200">Dirección pública</label><p className="mt-1 text-sm text-slate-500">Elegí una dirección corta y fácil de recordar.</p>
           <div className="mt-2 flex flex-col gap-3 sm:flex-row"><input id="slug" value={slug} onChange={(e) => { setSlug(e.target.value); setSlugSavedMsg(null); setSlugError(null); }} className={fieldClass} placeholder="mi-negocio" aria-describedby="slug-help slug-status" /><button type="button" onClick={handleSaveSlug} disabled={slugSaving || slugChecking || !slug || (slugCheck ? !slugCheck.available : true) || slug.trim() === persistedSlug} className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-900 disabled:opacity-50">{slugSaving ? 'Guardando...' : 'Guardar dirección'}</button></div>
           <div id="slug-status" className="mt-2 text-sm" aria-live="polite">{slugChecking && <span className="text-slate-400">Revisando disponibilidad...</span>}{!slugChecking && slugCheck?.available && slug.trim() !== persistedSlug && <span className="text-emerald-300">Esta dirección está disponible.</span>}{!slugChecking && slugCheck && !slugCheck.available && <span className="text-red-300">{slugCheck.error || 'Esta dirección no está disponible.'}</span>}{slugError && <span className="text-red-300">{slugError}</span>}{slugSavedMsg && <span className="text-emerald-300">{slugSavedMsg}</span>}</div>
-          <p id="slug-help" className="mt-3 text-sm leading-6 text-amber-100/70">Solo letras, números y guiones. Cambiarla puede dejar inválidos los links que ya compartiste, así que avisales a tus clientes si la modificás.</p>
+          <p id="slug-help" className="mt-3 text-sm leading-6 text-amber-100/70">Solo letras, números y guiones. Si la cambiás, los links que ya compartiste pueden dejar de funcionar. Avisales a tus clientes antes de hacerlo.</p>
         </section>
 
         <div className="sticky bottom-3 z-10 flex flex-col gap-3 rounded-2xl border border-slate-700 bg-slate-950/95 p-3 shadow-2xl backdrop-blur sm:flex-row sm:items-center sm:justify-between"><p className="text-sm" aria-live="polite">{saveState === 'unsaved' && <span className="text-amber-300">Tenés cambios sin guardar.</span>}{saveState === 'saving' && <span className="text-slate-300">Guardando cambios...</span>}{saveState === 'saved' && <span className="text-emerald-300">Todos los cambios están guardados.</span>}{saveState === 'error' && <span className="text-red-300">No se pudieron guardar los cambios.</span>}</p><button type="submit" disabled={saving} className="rounded-full bg-slate-100 px-5 py-2.5 text-sm font-medium text-slate-900 transition hover:bg-white disabled:opacity-50">{saving ? 'Guardando...' : 'Guardar cambios'}</button></div>

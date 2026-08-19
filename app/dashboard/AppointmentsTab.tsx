@@ -6,6 +6,21 @@ type Slot = { startTime: string; endTime: string };
 type ViewMode = 'day' | 'week';
 type StatusFilter = 'request' | 'confirmed' | 'all';
 type PendingAction = { kind: 'reminder' | 'status'; appointment: AdminAppointment; action?: 'confirm' | 'reject' };
+type ErrorArea = 'appointments' | 'summary' | 'action' | 'slots' | 'reschedule';
+
+function ownerErrorMessage(status: number, area: ErrorArea) {
+  if (status === 401) return 'Tu sesión venció. Iniciá sesión nuevamente para continuar.';
+  if (status === 402) return 'Tu acceso está pausado por el estado de tu plan. Revisá Facturación para recuperar la gestión de turnos.';
+  if (status === 403) return 'No tenés permiso para gestionar estos turnos. Revisá la cuenta del negocio o contactá soporte.';
+  if (status === 404) return area === 'slots' ? 'No encontramos el servicio elegido. Cerrá este diálogo y actualizá la agenda.' : 'El turno ya no está disponible. Actualizá la agenda e intentá nuevamente.';
+  if (status === 409) return area === 'reschedule' ? 'Ese horario ya no está disponible. Elegí otro horario e intentá nuevamente.' : 'El turno cambió mientras lo gestionabas. Actualizá la agenda e intentá nuevamente.';
+  if (status >= 500) return 'Tuvimos un problema al conectar con la agenda. Revisá tu conexión e intentá nuevamente.';
+  if (area === 'summary') return 'No pudimos cargar el resumen de tu agenda. Revisá tu conexión e intentá nuevamente.';
+  if (area === 'slots') return 'No pudimos cargar los horarios disponibles. Revisá tu conexión e intentá nuevamente.';
+  if (area === 'reschedule') return 'No pudimos reprogramar el turno. Revisá los datos e intentá nuevamente.';
+  if (area === 'action') return 'No pudimos completar la acción. Revisá tu conexión e intentá nuevamente.';
+  return 'No pudimos cargar los turnos. Revisá tu conexión e intentá nuevamente.';
+}
 
 function dateParts(date: string) {
   const [year, month, day] = date.split('-').map(Number);
@@ -79,23 +94,29 @@ export default function AppointmentsTab({ brand }: { brand?: BrandConfig }) {
 
   async function loadAppointments() {
     setLoading(true); setError(null);
+    let failureMessage = ownerErrorMessage(0, 'appointments');
     try {
       const params = new URLSearchParams({ status: statusFilter });
       if (viewMode === 'day') params.set('date', date);
       else { const range = getWeekRange(date); params.set('from', range.from); params.set('to', range.to); }
       const response = await fetch(`/api/admin/appointments?${params}`);
       const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'No se pudieron cargar los turnos.');
+      if (!response.ok) {
+        console.error('GET /api/admin/appointments failed', { status: response.status, code: json.code, error: json.error });
+        failureMessage = ownerErrorMessage(response.status, 'appointments');
+        throw new Error('Appointment list request failed');
+      }
       setAppointments((json.appointments || []).filter((appt: AdminAppointment) => {
         if (appt.date !== localDateString()) return true;
         return new Date(`${appt.date}T${appt.endTime}:00`) >= new Date();
       }));
-    } catch (cause) { console.error(cause); setAppointments([]); setError(cause instanceof Error ? cause.message : 'No se pudieron cargar los turnos.'); }
+    } catch (cause) { console.error(cause); setAppointments([]); setError(failureMessage); }
     finally { setLoading(false); }
   }
 
   async function loadSummary() {
     setLoadingSummary(true); setSummaryError(null);
+    let failureMessage = ownerErrorMessage(0, 'summary');
     try {
       const today = localDateString(); const tomorrow = localDateString(1);
       const [todayResponse, tomorrowResponse] = await Promise.all([
@@ -103,9 +124,15 @@ export default function AppointmentsTab({ brand }: { brand?: BrandConfig }) {
         fetch(`/api/admin/appointments?status=confirmed&date=${tomorrow}`),
       ]);
       const [todayJson, tomorrowJson] = await Promise.all([todayResponse.json(), tomorrowResponse.json()]);
-      if (!todayResponse.ok || !tomorrowResponse.ok) throw new Error('No se pudo cargar el resumen.');
+      if (!todayResponse.ok || !tomorrowResponse.ok) {
+        const failedResponse = todayResponse.ok ? tomorrowResponse : todayResponse;
+        const failedJson = todayResponse.ok ? tomorrowJson : todayJson;
+        console.error('GET /api/admin/appointments summary failed', { status: failedResponse.status, code: failedJson.code, error: failedJson.error });
+        failureMessage = ownerErrorMessage(failedResponse.status, 'summary');
+        throw new Error('Appointment summary request failed');
+      }
       setSummary({ today: todayJson.appointments || [], tomorrow: tomorrowJson.appointments || [] });
-    } catch (cause) { console.error(cause); setSummary(null); setSummaryError(cause instanceof Error ? cause.message : 'No se pudo cargar el resumen.'); }
+    } catch (cause) { console.error(cause); setSummary(null); setSummaryError(failureMessage); }
     finally { setLoadingSummary(false); }
   }
 
@@ -113,13 +140,18 @@ export default function AppointmentsTab({ brand }: { brand?: BrandConfig }) {
     if (!pendingAction) return;
     setActionLoading(true); setFeedback(null);
     const { appointment, kind, action } = pendingAction;
+    let failureMessage = ownerErrorMessage(0, 'action');
     try {
       const response = await fetch(`/api/admin/appointments/${appointment.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: kind === 'reminder' ? 'remind' : action }),
       });
       const json = await response.json();
-      if (!response.ok) throw new Error(json.error || 'No se pudo actualizar el turno.');
+      if (!response.ok) {
+        console.error('PATCH /api/admin/appointments/[id] failed', { status: response.status, code: json.code, error: json.error });
+        failureMessage = ownerErrorMessage(response.status, 'action');
+        throw new Error('Appointment action request failed');
+      }
       if (json.waUrl) window.open(json.waUrl, '_blank', 'noopener,noreferrer');
       if (kind === 'status') {
         setAppointments((current) => current.map((item) => item.id === appointment.id ? { ...item, status: json.status } : item));
@@ -129,7 +161,7 @@ export default function AppointmentsTab({ brand }: { brand?: BrandConfig }) {
         setSummary((current) => current ? { today: current.today.map((item) => item.id === appointment.id ? { ...item, reminderSent: json.reminderSent } : item), tomorrow: current.tomorrow } : current);
       }
       setPendingAction(null); void loadSummary();
-    } catch (cause) { console.error(cause); setFeedback(cause instanceof Error ? cause.message : 'No se pudo completar la acción.'); }
+    } catch (cause) { console.error(cause); setFeedback(failureMessage); }
     finally { setActionLoading(false); }
   }
 
@@ -139,24 +171,36 @@ export default function AppointmentsTab({ brand }: { brand?: BrandConfig }) {
   async function loadSlots() {
     if (!rescheduleAppt || !rescheduleDate) { setRescheduleError('Elegí una fecha para ver horarios disponibles.'); return; }
     setRescheduleLoading(true); setRescheduleError(null); setRescheduleMessage(null);
+    let failureMessage = ownerErrorMessage(0, 'slots');
     try {
       const response = await fetch(`/api/admin/availability?date=${rescheduleDate}&serviceId=${rescheduleAppt.serviceId}`);
-      const json = await response.json(); if (!response.ok) throw new Error(json.error || 'No se pudieron cargar los horarios.');
+      const json = await response.json();
+      if (!response.ok) {
+        console.error('GET /api/admin/availability failed', { status: response.status, code: json.code, error: json.error });
+        failureMessage = ownerErrorMessage(response.status, 'slots');
+        throw new Error('Availability request failed');
+      }
       const slots: Slot[] = json.slots || []; setRescheduleSlots(slots); if (!slots.length) setRescheduleMessage('No hay horarios disponibles para esa fecha.');
-    } catch (cause) { console.error(cause); setRescheduleError(cause instanceof Error ? cause.message : 'No se pudieron cargar los horarios.'); }
+    } catch (cause) { console.error(cause); setRescheduleError(failureMessage); }
     finally { setRescheduleLoading(false); }
   }
 
   async function submitReschedule(event: FormEvent) {
     event.preventDefault(); if (!rescheduleAppt || !rescheduleDate || !rescheduleTime) { setRescheduleError('Elegí la nueva fecha y horario.'); return; }
     setRescheduleSaving(true); setRescheduleError(null);
+    let failureMessage = ownerErrorMessage(0, 'reschedule');
     try {
       const response = await fetch(`/api/admin/appointments/${rescheduleAppt.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'reschedule', newDate: rescheduleDate, newStartTime: rescheduleTime }) });
-      const json = await response.json(); if (!response.ok) throw new Error(json.error || 'No se pudo reprogramar el turno.');
+      const json = await response.json();
+      if (!response.ok) {
+        console.error('PATCH /api/admin/appointments/[id] reschedule failed', { status: response.status, code: json.code, error: json.error });
+        failureMessage = ownerErrorMessage(response.status, 'reschedule');
+        throw new Error('Appointment reschedule request failed');
+      }
       if (json.waUrl) window.open(json.waUrl, '_blank', 'noopener,noreferrer');
       setAppointments((current) => current.map((item) => item.id === rescheduleAppt.id ? { ...item, date: json.date, startTime: json.startTime, endTime: json.endTime } : item));
       closeReschedule(); setFeedback(json.waUrl ? 'Turno reprogramado. WhatsApp se abrió para comunicar el cambio manualmente.' : 'Turno reprogramado. El cambio fue registrado, pero no hay un enlace telefónico utilizable para abrir WhatsApp.'); void loadSummary();
-    } catch (cause) { console.error(cause); setRescheduleError(cause instanceof Error ? cause.message : 'No se pudo reprogramar el turno.'); }
+    } catch (cause) { console.error(cause); setRescheduleError(failureMessage); }
     finally { setRescheduleSaving(false); }
   }
 

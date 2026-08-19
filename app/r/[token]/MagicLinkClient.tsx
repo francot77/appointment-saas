@@ -1,4 +1,3 @@
-// app/r/[token]/MagicLinkClient.tsx
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
@@ -41,7 +40,6 @@ export default function MagicLinkClient({ token }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // reprogramar
   const [date, setDate] = useState('');
   const [slots, setSlots] = useState<Slot[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
@@ -67,19 +65,19 @@ export default function MagicLinkClient({ token }: Props) {
       const res = await fetch(`/api/client/appointments/${token}`, {
         signal: controller.signal,
       });
-      const json = await res.json();
+       const json = await res.json();
 
       if (!res.ok) {
         setError(
           res.status === 404 || res.status === 410
             ? 'Este link ya no es válido o expiró. Pedile al negocio que te envíe un nuevo link.'
-            : json.error || 'No se pudo cargar el turno. Intentá nuevamente.'
+             : 'No pudimos cargar tu turno. Intentá nuevamente.'
         );
         setAppt(null);
         return;
       }
 
-      setAppt(json);
+        setAppt(json);
       setDate(json.date);
     } catch (e) {
       console.error(e);
@@ -123,14 +121,14 @@ export default function MagicLinkClient({ token }: Props) {
       const res = await fetch(
         `/api/public/${appt.business.slug}/availability?${params.toString()}`
       );
-      const json = await res.json();
+       const json = await res.json();
 
       if (!res.ok) {
-        setError(json.error || 'Error obteniendo horarios');
+        setError('No pudimos buscar horarios para esa fecha. Intentá nuevamente.');
         return;
       }
 
-      const sl: Slot[] = json.slots || [];
+       const sl: Slot[] = json.slots || [];
       setSlots(sl);
 
       if (sl.length === 0) {
@@ -138,7 +136,7 @@ export default function MagicLinkClient({ token }: Props) {
       }
     } catch (e) {
       console.error(e);
-      setError('Error obteniendo horarios');
+      setError('No pudimos buscar horarios para esa fecha. Intentá nuevamente.');
     } finally {
       setLoadingSlots(false);
     }
@@ -163,10 +161,10 @@ export default function MagicLinkClient({ token }: Props) {
         body: JSON.stringify({ action: 'cancel' }),
       });
 
-      const json = await res.json();
+       await res.json();
 
-      if (!res.ok) {
-        setError(json.error || 'No se pudo cancelar el turno');
+       if (!res.ok) {
+         setError('No pudimos cancelar el turno. Intentá nuevamente.');
         return;
       }
 
@@ -186,7 +184,6 @@ export default function MagicLinkClient({ token }: Props) {
       return;
     }
 
-    // guardamos datos ANTES de actualizar
     const oldDate = appt.date;
     const oldTime = appt.startTime;
     const serviceName = appt.service?.name ?? '';
@@ -209,11 +206,10 @@ export default function MagicLinkClient({ token }: Props) {
       const json = await res.json();
 
       if (!res.ok) {
-        setError(json.error || 'No se pudo reprogramar el turno');
+        setError('No pudimos reprogramar el turno. Intentá nuevamente.');
         return;
       }
 
-      // actualizá estado local por si el usuario vuelve atrás / no navega
       setAppt((prev) =>
         prev
           ? {
@@ -225,7 +221,6 @@ export default function MagicLinkClient({ token }: Props) {
           : prev
       );
 
-      // armamos redirect "pro"
       const slug = appt.business?.slug;
       if (slug) {
         const params = new URLSearchParams();
@@ -237,7 +232,6 @@ export default function MagicLinkClient({ token }: Props) {
 
         router.push(`/${slug}/turno-actualizado?${params.toString()}`);
       } else {
-        // fallback si no hay slug por algún motivo raro
         setSuccessMessage(
           'Tu turno fue reprogramado correctamente. Se va a respetar el nuevo horario.'
         );
@@ -259,7 +253,6 @@ export default function MagicLinkClient({ token }: Props) {
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 flex justify-center px-4 py-6">
       <div className="w-full max-w-md space-y-4">
-        {/* Header */}
         <header className="flex items-center gap-3 mb-2">
           <div
             className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shadow-lg shadow-black/40"
@@ -309,7 +302,6 @@ export default function MagicLinkClient({ token }: Props) {
 
           {appt && (
             <>
-              {/* Info principal del turno */}
               <div className="space-y-1 text-xs">
                 <p className="text-[11px] text-slate-400">
                   Turno a nombre de{' '}
@@ -349,7 +341,7 @@ export default function MagicLinkClient({ token }: Props) {
                 )}
                 {['cancelled', 'rejected'].includes(appt.status) && (
                   <p className="text-[11px] text-red-400 mt-1">
-                    Este turno ya no está activo ({appt.status}).
+                     Este turno ya no está disponible.
                   </p>
                 )}
               </div>
@@ -361,9 +353,7 @@ export default function MagicLinkClient({ token }: Props) {
                 </div>
               )}
 
-              {/* Acciones */}
               <div className="mt-3 space-y-3">
-                {/* Cancelar */}
                 <button
                   type="button"
                   disabled={saving || disabledByStatus}
@@ -373,7 +363,6 @@ export default function MagicLinkClient({ token }: Props) {
                   Cancelar turno
                 </button>
 
-                {/* Reprogramar */}
                 {!disabledByStatus && appt.service && appt.business && (
                   <div className="mt-3 pt-3 border-t border-slate-800 space-y-2">
                     <p className="text-xs font-medium text-slate-200">
@@ -413,7 +402,6 @@ export default function MagicLinkClient({ token }: Props) {
                       </button>
                     </div>
 
-                    {/* Horarios */}
                     {slots.length > 0 && (
                       <div className="space-y-2">
                         <p className="text-[11px] text-slate-300">
