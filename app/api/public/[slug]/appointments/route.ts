@@ -23,6 +23,7 @@ import {
   rangesOverlap,
 } from '@/lib/time';
 import { logger } from '@/lib/logger';
+import { clientTokenExpiry, createClientToken, toPublicAppointmentDto } from '@/lib/clientAppointment';
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -147,15 +148,21 @@ export async function POST(req: NextRequest, props: Params) {
           startTime: startTime.value,
           endTime,
           status: 'request',
-          notes: notes.value || '',
-        }], { session });
+           notes: notes.value || '',
+           clientToken: createClientToken(),
+           clientTokenExpiresAt: clientTokenExpiry(),
+         }], { session });
 
         await AppointmentBookingLock.deleteOne({
           key: lockKey,
           token: lockToken,
         }, { session });
 
-        return NextResponse.json({ appointment: appt }, { status: 201 });
+        return NextResponse.json(toPublicAppointmentDto({
+          appointment: appt,
+          businessSlug: validSlug.value,
+          service,
+        }), { status: 201 });
       });
     } catch (error: unknown) {
       if ((error as { code?: number }).code === 11000) {

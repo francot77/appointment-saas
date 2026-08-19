@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { removeSavedAppointmentByToken, saveAppointment } from '@/lib/clientAppointmentsStorage';
 type Service = {
   id: string;
   name: string;
@@ -68,6 +69,7 @@ export default function MagicLinkClient({ token }: Props) {
        const json = await res.json();
 
       if (!res.ok) {
+        if (res.status === 404 || res.status === 410) removeSavedAppointmentByToken(token);
         setError(
           res.status === 404 || res.status === 410
             ? 'Este link ya no es válido o expiró. Pedile al negocio que te envíe un nuevo link.'
@@ -77,6 +79,21 @@ export default function MagicLinkClient({ token }: Props) {
         return;
       }
 
+        if (json.managementToken && json.tokenExpiresAt && json.business?.slug) {
+          saveAppointment({
+            id: json.id,
+            reference: json.id,
+            businessSlug: json.business.slug,
+            date: json.date,
+            startTime: json.startTime,
+            endTime: json.endTime,
+            status: json.status,
+            serviceName: json.service?.name || '',
+            managementToken: json.managementToken,
+            managementUrl: json.managementUrl || `/r/${json.managementToken}`,
+            tokenExpiresAt: json.tokenExpiresAt,
+          });
+        }
         setAppt(json);
       setDate(json.date);
     } catch (e) {

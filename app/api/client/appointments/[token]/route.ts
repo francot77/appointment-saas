@@ -67,15 +67,18 @@ export async function GET(_req: NextRequest, props: Params) {
               durationMinutes: service.durationMinutes || 60,
             }
           : null,
-        business: business
-          ? {
+         business: business
+           ? {
               id: String(business._id),
               name: business.name,
               slug: business.slug,
-              primaryColor: business.primaryColor || '#6366F1',
-            }
-          : null,
-      },
+               primaryColor: business.primaryColor || '#6366F1',
+             }
+           : null,
+        managementToken: token,
+        managementUrl: `/r/${token}`,
+        tokenExpiresAt: appt.clientTokenExpiresAt?.toISOString(),
+         },
       { status: 200 }
     );
   } catch (err) {

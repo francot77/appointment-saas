@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import SavedAppointments from './SavedAppointments';
 
 type UiSettings = {
   primaryColor: string;
@@ -237,6 +238,7 @@ export default function BusinessLandingClient({ slug, settings }: Props) {
           </div>
         </aside>
       </div>
+      <SavedAppointments key={slug} slug={slug} />
     </main>
   );
 }

@@ -75,6 +75,14 @@ Rollback only the application release that introduced the regression. Preserve d
 
 **Owner: assign. Action: document deployment rollback command, approval authority, and database recovery boundary.**
 
+## Business PWA and local access
+
+Public business pages emit tenant-scoped manifests with configured public branding only. Verify `/<slug>/manifest.webmanifest` after a release and confirm `start_url` is `/<slug>/turnos`, `scope` is `/<slug>/`, and no provider/payment secret is present. A missing or unsafe logo falls back to the public FezTime icons.
+
+Appointment management tokens are stored server-side with an expiry and are also returned as bearer links to the customer. The browser stores only a bounded, slug-filtered list of token references and appointment display data; it never stores customer PII. `localStorage` is convenience storage, not cryptographic protection: same-origin JavaScript/XSS can read the token. Customers can remove entries, and expired or invalid entries are removed without cancelling or changing the appointment.
+
+PWA uninstall/reinstall behavior is browser-controlled. Uninstalling removes the installed shell but may leave site storage; reinstalling does not guarantee recovery after site data is cleared. Support should ask for the business link or a fresh management link rather than requesting customer phone data in browser storage.
+
 ## Alert ownership
 
 The following ownership is intentionally unassigned until the operating team confirms it:

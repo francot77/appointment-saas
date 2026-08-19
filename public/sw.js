@@ -2,9 +2,8 @@ const CACHE_NAME = 'feztime-v1';
 
 const URLS_TO_CACHE = [
   '/',
-  '/turnos',
   '/favicon.ico',
-  '/manifest.webmanifest'
+  '/manifest.json'
   // podés sumar CSS/fonts si querés
 ];
 
@@ -36,6 +35,13 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
 
   if (request.method !== 'GET') {
+    return;
+  }
+
+  // Tenant pages must stay tenant-scoped; never serve a root fallback for them.
+  const pathname = new URL(request.url).pathname;
+  if (request.mode === 'navigate' && pathname !== '/' && !pathname.startsWith('/_next/')) {
+    event.respondWith(fetch(request));
     return;
   }
 

@@ -60,6 +60,27 @@ FezTime has public booking, authenticated business management, MongoDB persisten
 | P1 | Material conversion, trust, or support risk | Complete before broad launch; can follow a private pilot |
 | P2 | Scale, polish, or expansion | Post-launch unless evidence promotes it |
 
+## Work Unit: Business PWA and local appointment access
+
+**Outcome:** Keep an installed customer PWA tied to the business that launched it and let customers return to current appointments after closing the page.
+
+**Decisions:**
+
+- Public business manifests use real business/settings branding, safe color fallbacks, validated public logos, `/<slug>/turnos` as `start_url`, and `/<slug>/` as scope. The root FezTime manifest remains separate.
+- Public booking creates a random server-side bearer token with a 30-day expiry and returns a minimal DTO. The browser stores no client name, phone, or notes.
+- Local storage is bounded to five entries and filtered by business slug. It is convenience storage, not cryptographic protection: same-origin JavaScript/XSS can read the bearer token. Removal, expiry cleanup, and friendly invalid-link handling are required.
+- Uninstalling/reinstalling a PWA does not promise preservation of browser site data. Clearing site data removes local entries; a fresh management link may be needed.
+
+**Acceptance criteria:**
+
+- [x] Dynamic tenant manifest and metadata preserve business identity without exposing secrets.
+- [x] Public booking returns a minimal DTO, persists a management token, and exposes a management link.
+- [x] Matching-business saved appointments are visible with removal controls; other businesses are not shown.
+- [x] Service-worker navigation does not redirect tenant routes to the FezTime home.
+- [x] Security limitations and uninstall/reinstall expectations are documented.
+
+**Rollback boundary:** Remove `lib/clientAppointment.ts`, `lib/clientAppointmentsStorage.ts`, `app/[slug]/manifest.webmanifest/route.ts`, `app/[slug]/SavedAppointments.tsx`, and the scoped integrations in public booking, metadata, confirmation, magic-link, and service-worker files, plus this entry and its focused tests/docs. Preserve all unrelated dirty-worktree changes and appointment records.
+
 ## Technical SEO Foundation
 
 **Outcome:** Make real public business pages discoverable without exposing private, transactional, or invalid tenant URLs.

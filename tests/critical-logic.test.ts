@@ -7,6 +7,7 @@ import { date, email, positiveInteger, time } from '@/lib/validation';
 import { validateSlug } from '@/lib/slug';
 import { publicBookingRateLimit } from '@/lib/publicRateLimit';
 import { getSeoBaseUrl } from '@/lib/seo';
+import { createClientToken, clientTokenExpiry, toPublicAppointmentDto } from '@/lib/clientAppointment';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -125,5 +126,28 @@ describe('public booking rate limit', () => {
     const results = Array.from({ length: 6 }, () => publicBookingRateLimit(request as never, scope));
     expect(results.slice(0, 5)).toEqual([null, null, null, null, null]);
     expect(results[5]).not.toBeNull();
+  });
+});
+
+describe('public appointment access', () => {
+  it('creates a random bearer token with a bounded expiry', () => {
+    const token = createClientToken();
+    expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(clientTokenExpiry(new Date('2026-01-01T00:00:00.000Z')).toISOString()).toBe('2026-01-31T00:00:00.000Z');
+  });
+
+  it('returns the minimal public appointment DTO without PII', () => {
+    const dto = toPublicAppointmentDto({
+      appointment: {
+        _id: 'appointment-id', date: '2026-01-02', startTime: '10:00', endTime: '11:00', status: 'request',
+        clientToken: 'token', clientTokenExpiresAt: new Date('2026-01-31T00:00:00.000Z'),
+      },
+      businessSlug: 'demo',
+      service: { name: 'Corte', durationMinutes: 60 },
+    });
+    expect(dto.appointment).toMatchObject({ id: 'appointment-id', businessSlug: 'demo', managementUrl: '/r/token' });
+    expect(dto.appointment).not.toHaveProperty('clientName');
+    expect(dto.appointment).not.toHaveProperty('clientPhone');
+    expect(dto.appointment).not.toHaveProperty('notes');
   });
 });

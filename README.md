@@ -76,3 +76,11 @@ Ver [`COMMERCIALIZATION_PLAN.md`](./COMMERCIALIZATION_PLAN.md) para el orden de 
 - Ajustes de accesibilidad: focus-visible rings en navegación, formularios y CTAs.
 - Ajustes visuales: paleta indigo/cyan, tipografía base y consistencia de estilos.
 - Enlaces de footer corregidos con páginas `terms` y `privacy` (placeholders).
+
+## PWA por negocio y turnos guardados
+
+- Cada landing pública válida (`/<slug>`) publica un manifest propio en `/<slug>/manifest.webmanifest`. Su nombre, logo, colores, iconos y destino de apertura pertenecen al negocio; la instalación abre `/<slug>/turnos` y queda dentro del scope `/<slug>/`.
+- El manifest raíz continúa siendo el de FezTime. El service worker no reemplaza navegaciones tenant por la home raíz.
+- Las solicitudes públicas reciben un token aleatorio de gestión con vencimiento. El éxito muestra `Gestionar mi turno` y guarda como máximo cinco accesos actuales en el dispositivo, filtrados por negocio.
+- El almacenamiento local no contiene nombre, teléfono ni notas. El token es un bearer link: sigue siendo legible por JavaScript del mismo origen si existe una vulnerabilidad XSS. Por eso hay control `Quitar`, limpieza por vencimiento y no se presenta como almacenamiento criptográficamente seguro.
+- Desinstalar la PWA elimina su instalación, no necesariamente el `localStorage`; borrar los accesos desde la sección o limpiar los datos del sitio los elimina. Reinstalar no recupera accesos si se borraron los datos del navegador.

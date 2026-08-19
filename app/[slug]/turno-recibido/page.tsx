@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 type Props = {
   params: Promise<{ slug: string }>;
-  searchParams?: Promise<{ date?: string; time?: string; service?: string; reference?: string }>;
+  searchParams?: Promise<{ date?: string; time?: string; service?: string; reference?: string; token?: string }>;
 };
 
 export const metadata: Metadata = { title: 'Solicitud recibida', robots: { index: false, follow: false } };
@@ -29,7 +29,7 @@ function readableText(color: string) {
 export default async function TurnoRecibidoPage(props: Props) {
   const [params, search] = await Promise.all([props.params, props.searchParams ?? Promise.resolve({})]);
   const { slug } = params;
-  const { date, time, service, reference } = (search || {}) as any;
+  const { date, time, service, reference, token } = (search || {}) as any;
   const parsedDate = validateDate(date);
   const safeDate = parsedDate.ok ? parsedDate.value : undefined;
   await dbConnect();
@@ -41,6 +41,7 @@ export default async function TurnoRecibidoPage(props: Props) {
     if (time) qp.set('time', String(time));
     if (service) qp.set('service', String(service));
     if (reference) qp.set('reference', String(reference));
+     if (token) qp.set('token', String(token));
     redirect(`/${(business as any).slug}/turno-recibido${qp.toString() ? `?${qp}` : ''}`);
   }
 
@@ -59,8 +60,9 @@ export default async function TurnoRecibidoPage(props: Props) {
           <p className="mt-3 text-[16px] leading-6 text-[#617083]">El negocio recibió tus datos y va a revisar el horario elegido. Esto todavía no es una confirmación.</p>
           <div role="status" aria-live="polite" className="mt-6 rounded-2xl border border-[#d8b66b] bg-[#fff8e7] p-4 text-[15px] leading-6"><strong>Próximo paso:</strong> esperá la confirmación del negocio por WhatsApp o por el canal que use. Si trabajan con confirmación manual, ese mensaje es el que valida tu turno.</div>
           {(date || time || service) && <div className="mt-6 rounded-2xl border border-[#ded9cf] bg-[#faf8f3] p-5"><h2 className="text-[13px] font-semibold uppercase tracking-[0.12em] text-[#617083]">Resumen de la solicitud</h2><dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4 text-[15px]">{service && <SummaryItem label="Servicio" value={String(service)} />}{date && <SummaryItem label="Fecha" value={readableDate || 'Fecha no disponible'} />}{time && <SummaryItem label="Horario" value={`${time} hs`} />}{reference && <SummaryItem label="Referencia" value={String(reference)} />}</dl></div>}
-          <p className="mt-6 text-[15px] leading-6 text-[#617083]">Cuando el negocio confirme, guardá ese mensaje. Si no recibís noticias en un tiempo razonable, contactalo directamente por WhatsApp si tiene ese canal habilitado.</p>
-          <a href={`/${slug}/turnos`} className="mt-7 inline-flex min-h-12 w-full items-center justify-center rounded-full px-5 text-[16px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2" style={{ backgroundColor: primaryColor, color: readableText(primaryColor), outlineColor: primaryColor }}>Hacer otra solicitud</a>
+           <p className="mt-6 text-[15px] leading-6 text-[#617083]">Cuando el negocio confirme, guardá ese mensaje. Si no recibís noticias en un tiempo razonable, contactalo directamente por WhatsApp si tiene ese canal habilitado.</p>
+           {token && <a href={`/r/${encodeURIComponent(String(token))}`} className="mt-5 inline-flex min-h-12 w-full items-center justify-center rounded-full border border-[#18212b] px-5 text-[16px] font-semibold">Gestionar mi turno</a>}
+           <a href={`/${slug}/turnos`} className="mt-7 inline-flex min-h-12 w-full items-center justify-center rounded-full px-5 text-[16px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2" style={{ backgroundColor: primaryColor, color: readableText(primaryColor), outlineColor: primaryColor }}>Hacer otra solicitud</a>
         </section>
       </div>
     </main>

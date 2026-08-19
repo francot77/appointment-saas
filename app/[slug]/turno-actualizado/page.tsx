@@ -1,9 +1,8 @@
-// app/[slug]/turno-actualizado/page.tsx
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import dbConnect from '@/lib/db';
-import { Business } from '@/lib/models/Business';
+import { getBusinessBySlug } from '@/lib/getBusinessBySlug';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,9 +35,19 @@ export default async function TurnoActualizadoPage(props: Props) {
   const { oldDate, oldTime, newDate, newTime, service } = (search || {}) as any;
 
   await dbConnect();
-  const business = await Business.findOne({ slug }).lean();
+  const business = await getBusinessBySlug(slug);
 
   if (!business) notFound();
+  if ((business as any).slug && (business as any).slug !== slug) {
+    const qp = new URLSearchParams();
+    if (oldDate) qp.set('oldDate', String(oldDate));
+    if (oldTime) qp.set('oldTime', String(oldTime));
+    if (newDate) qp.set('newDate', String(newDate));
+    if (newTime) qp.set('newTime', String(newTime));
+    if (service) qp.set('service', String(service));
+    const suffix = qp.toString() ? `?${qp.toString()}` : '';
+    redirect(`/${(business as any).slug}/turno-actualizado${suffix}`);
+  }
 
   const businessName: string = business.name || 'Tu turno';
   const primaryColor: string = business.primaryColor || '#6366F1';

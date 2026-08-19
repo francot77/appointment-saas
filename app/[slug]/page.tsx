@@ -24,10 +24,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const name = String(settings.publicName || business.name || 'Negocio').trim();
   const description = String(settings.heroSubtitle || business.tagline || `Solicitá un turno en ${name}.`).trim();
   const baseUrl = getSeoBaseUrl();
-  const image = toSafeAbsoluteUrl(settings.logoUrl, baseUrl);
+   const image = toSafeAbsoluteUrl(settings.logoUrl, baseUrl);
 
   return {
-    title: `${name} | Turnos online`,
+     title: `${name} | Turnos online`,
+     manifest: `/${currentSlug}/manifest.webmanifest`,
+     icons: image ? { icon: [{ url: image }], apple: [{ url: image }] } : undefined,
     description,
     alternates: { canonical: `/${currentSlug}` },
     openGraph: {

@@ -3,6 +3,8 @@
 
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import SavedAppointments from './SavedAppointments';
+import { saveAppointment } from '@/lib/clientAppointmentsStorage';
 
 type Service = {
   id: string;
@@ -222,13 +224,30 @@ export default function TurnosClient({ slug, businessName, services, settings }:
         return;
       }
 
+      const appointment = json.appointment;
+      if (appointment?.managementToken && appointment?.tokenExpiresAt) {
+        saveAppointment({
+          id: appointment.id,
+          reference: appointment.reference,
+          businessSlug: appointment.businessSlug || slug,
+          date: appointment.date,
+          startTime: appointment.startTime,
+          endTime: appointment.endTime,
+          status: appointment.status,
+          serviceName: appointment.service?.name || selectedService?.name || '',
+          managementToken: appointment.managementToken,
+          managementUrl: appointment.managementUrl || `/r/${appointment.managementToken}`,
+          tokenExpiresAt: appointment.tokenExpiresAt,
+        });
+      }
       const params = new URLSearchParams({
         date,
         time: selectedSlot.startTime,
         service: selectedService?.name || '',
       });
-      const reference = json.appointment?._id || json.appointment?.id;
+      const reference = appointment?.reference || appointment?.id;
       if (reference) params.set('reference', String(reference));
+      if (appointment?.managementToken) params.set('token', appointment.managementToken);
       router.push(`/${slug}/turno-recibido?${params.toString()}`);
     } catch (error) {
       console.error(error);
@@ -383,7 +402,8 @@ export default function TurnosClient({ slug, businessName, services, settings }:
         </section>
 
         {settings.aboutEnabled && (settings.aboutTitle?.trim() || settings.aboutText?.trim()) && <section className="mt-5 rounded-2xl border border-[#ded9cf] bg-white p-5"><h2 className="text-lg font-semibold">{settings.aboutTitle?.trim() || 'Sobre el negocio'}</h2><p className="mt-2 whitespace-pre-line text-[15px] leading-6 text-[#617083]">{settings.aboutText}</p></section>}
-        {(settings.whatsappNumber || settings.instagramHandle || settings.address) && <section className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-[15px] text-[#617083]"><span className="sr-only">Información de contacto:</span>{settings.whatsappNumber && <a className="underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2" style={{ outlineColor: primaryColor }} href={`https://wa.me/${settings.whatsappNumber.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">WhatsApp</a>}{settings.instagramHandle && <a className="underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2" style={{ outlineColor: primaryColor }} href={`https://instagram.com/${settings.instagramHandle.replace(/^@/, '')}`} target="_blank" rel="noreferrer">Instagram</a>}{settings.address && <span>{settings.address}</span>}</section>}
+         <SavedAppointments key={slug} slug={slug} />
+         {(settings.whatsappNumber || settings.instagramHandle || settings.address) && <section className="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-[15px] text-[#617083]"><span className="sr-only">Información de contacto:</span>{settings.whatsappNumber && <a className="underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2" style={{ outlineColor: primaryColor }} href={`https://wa.me/${settings.whatsappNumber.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">WhatsApp</a>}{settings.instagramHandle && <a className="underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2" style={{ outlineColor: primaryColor }} href={`https://instagram.com/${settings.instagramHandle.replace(/^@/, '')}`} target="_blank" rel="noreferrer">Instagram</a>}{settings.address && <span>{settings.address}</span>}</section>}
       </div>
     </main>
   );
