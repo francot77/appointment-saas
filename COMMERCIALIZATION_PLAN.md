@@ -35,15 +35,15 @@ FezTime has public booking, authenticated business management, MongoDB persisten
 
 ## Visual Work Unit: Demo, Editorial clara
 
-**Outcome:** Make `/demo` feel like the same FezTime product as the public booking and dashboard surfaces while keeping the walkthrough explicitly simulated.
+**Outcome:** Make `/demo` feel like the same FezTime product as the public booking and dashboard surfaces while showing the value of a clear booking journey.
 
 **Scope:** `app/demo/page.tsx` and this roadmap entry only. Real booking, dashboard, billing, authentication, APIs, and shared landing styles remain unchanged.
 
 **Acceptance criteria:**
 
 - [x] Demo uses the Editorial-light canvas, readable typography, restrained indigo/coral accents, existing FezTime logo, responsive cards, and no dark SaaS/glow/emoji treatment.
-- [x] Demo framing identifies the surface as a preview, labels example data as fictitious, explains that changes do not persist, and exposes `/register` and `/login` paths.
-- [x] The five-step walkthrough remains available; slot and reschedule selections are local preview interactions, while non-functional admin actions are presented as explanatory text instead of fake buttons.
+- [x] Demo framing explains the booking journey, identifies example data, clarifies that no real appointments are created, and exposes `/register` and `/login` paths.
+- [x] The five-step walkthrough remains available; slot and reschedule selections let visitors explore the customer journey, while the business view keeps attention on appointment status and details.
 - [x] Focus states, keyboard semantics, contrast, touch targets, and no horizontal overflow are verified at desktop and 390px mobile widths.
 - [x] No customer metrics, testimonials, automation claims, or new dependencies are introduced.
 - [x] `npx tsc --noEmit`, `npm run lint`, `npm run build`, and `git diff --check` pass; browser smoke is recorded when an available local port permits it.
@@ -71,7 +71,7 @@ FezTime has public booking, authenticated business management, MongoDB persisten
 **Acceptance criteria:**
 
 - [x] Visible implementation notes, raw provider/API errors, internal statuses, and developer jargon are removed or mapped to owner/customer language.
-- [x] Demo keeps the simulation disclaimer and clearly states that example data does not create bookings or save changes.
+- [x] Demo keeps one concise note that example data does not create real appointments or save changes.
 - [x] URL changes continue to warn that previously shared links may stop working.
 - [x] No API response shape, internal name, error code, log, or technical documentation was changed.
 
