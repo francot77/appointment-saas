@@ -21,6 +21,37 @@ Required or production-recommended variables are listed in [`README.md`](../READ
 | `MP_BASIC_PRICE_ARS` | Current basic-plan price in whole ARS units | **Owner: assign. Action: set `100` only for temporary production testing, then restore `10000` before commercial launch.** |
 | `MP_ACCEPTED_PRICES_ARS` | Explicit comma-separated ARS prices accepted by webhook/reconciliation during a transition | **Owner: assign. Action: include every intentional prior price, then remove it only after the delayed-payment/reconciliation window is clear.** |
 
+### Automatic messaging prerequisites
+
+Automatic messaging is **disabled by default** (`MessagingConnection.enabled=false`). Before enabling a canary, verify:
+
+| Setting | Requirement |
+| --- | --- |
+| `INTERNAL_MESSAGING_RUN_SECRET` | Long random secret used only by the scheduler as a Bearer token. |
+| `MESSAGING_ENCRYPTION_KEYRING` / `MESSAGING_ENCRYPTION_KEY_ID` | JSON keyring with AES-256-GCM 32-byte keys and one active key ID. |
+| `META_WHATSAPP_APP_SECRET` / `META_WHATSAPP_VERIFY_TOKEN` | Deployment secrets for signed webhook and Meta challenge verification. |
+| Scheduler | HTTPS `GET /api/internal/messaging/run` every minute; each run is bounded to 20 jobs and safe to overlap. |
+| Meta webhook | Public HTTPS `GET/POST /api/webhooks/meta/whatsapp` with the exact callback URL and verify token. |
+| Templates | Approved `es_AR` Utility templates for `confirmed`, `rescheduled`, and `reminder`; no locale fallback. |
+
+Never put access tokens, app secrets, verification tokens, or encryption keys in client configuration, logs, CI output, or support tickets.
+
+#### Encryption key rotation
+
+1. Add the new 32-byte base64 key while retaining the previous key.
+2. Change `MESSAGING_ENCRYPTION_KEY_ID` to the new key ID and deploy.
+3. Confirm new writes use the new ID and existing connections still decrypt.
+4. Re-encrypt existing connection secrets, then retire the old key only after a restore test confirms no dependency remains.
+
+#### Canary, disable, and rollback
+
+1. Deploy with the scheduler stopped and all messaging connections disabled.
+2. Verify health, replica-set transactions, webhook challenge/signature checks, approved templates, and alert delivery.
+3. Enable one tenant, run the scheduler once, and confirm provider references/status webhooks without duplicate sends.
+4. Expand only after queue lag, retry/dead counts, ambiguous deliveries, and webhook failures stay within on-call thresholds.
+
+To disable or roll back, first disable affected connections, then stop the scheduler. Preserve jobs and appointment data. The legacy manual WhatsApp actions and `wa.me` links remain the fallback and must be tested during rollback.
+
 ### Safe transition procedure
 
 1. Set `MP_BASIC_PRICE_ARS=100` for the temporary production test.
@@ -36,6 +67,8 @@ CI uses repository code and dependency installation only. It does not require pr
 ## MongoDB availability
 
 Public booking and payment transitions use MongoDB transactions. Production MongoDB must be a replica set or sharded cluster. A standalone deployment is not a supported production topology for these paths and returns a temporary-unavailability response instead of claiming atomicity.
+
+Messaging job claims and appointment lifecycle invalidation rely on atomic MongoDB operations and tenant-scoped unique indexes. Run production and acceptance checks against a replica set or sharded cluster; a standalone MongoDB process is not an equivalent test environment.
 
 ## Health check
 
@@ -69,11 +102,15 @@ Before rolling out or relying on the unique `Payment.mpPaymentId` index, clean e
 
 Error tracking and alert routing are not configured by this change. **Owner: assign. Action: choose provider, define thresholds, and document on-call escalation.**
 
+For messaging, alert at minimum on scheduler silence, queue lag, lease age, retry/dead-letter growth, ambiguous `delivery_unknown` outcomes, invalid webhook signatures, webhook processing failures, and repeated provider 429/5xx responses. Alerts must contain only safe tenant, job, and provider references.
+
 ## Rollback
 
 Rollback only the application release that introduced the regression. Preserve database data and forward-compatible migrations; never roll back payment state or booking data by deleting production records. If a schema/index change is involved, stop and use the documented forward recovery procedure after assessing compatibility.
 
 **Owner: assign. Action: document deployment rollback command, approval authority, and database recovery boundary.**
+
+Messaging rollback boundary: disable tenant connections and stop the scheduler before reverting application code. Keep encrypted connection records, durable jobs, webhook audit records, appointment versions, and manual appointment routes intact.
 
 ## Business PWA and local access
 

@@ -22,6 +22,21 @@ Para pagos y URLs:
 - `MP_ACCESS_TOKEN_PROD` — token de MercadoPago (producción)
 - `MP_WEBHOOK_SECRET` — secreto de firma de Webhooks de Mercado Pago, configurado en Tus Integraciones
 
+Para mensajería automática (deshabilitada por defecto):
+
+- `INTERNAL_MESSAGING_RUN_SECRET` — secreto Bearer para el scheduler interno.
+- `MESSAGING_ENCRYPTION_KEYRING` — JSON con claves AES-256-GCM base64 de 32 bytes, indexadas por key ID.
+- `MESSAGING_ENCRYPTION_KEY_ID` — key ID activo para cifrar nuevas credenciales.
+- `META_WHATSAPP_APP_SECRET` — secreto de app usado para verificar firmas del webhook.
+- `META_WHATSAPP_VERIFY_TOKEN` — token de challenge del webhook de Meta.
+
+El scheduler invoca `GET /api/internal/messaging/run` cada minuto por HTTPS con
+`Authorization: Bearer <INTERNAL_MESSAGING_RUN_SECRET>` y procesa como máximo 20
+jobs por ejecución. El webhook HTTPS de Meta usa
+`GET/POST /api/webhooks/meta/whatsapp`; no se debe exponer por HTTP ni registrar
+su cuerpo crudo. Configurá y aprobá únicamente templates Utility `es_AR` para
+`confirmed`, `rescheduled` y `reminder`.
+
 Mercado Pago firma cada webhook con `x-signature` usando HMAC-SHA256 sobre `id`, `x-request-id` y `ts`; la aplicación rechaza firmas ausentes, inválidas o con más de cinco minutos. `MP_WEBHOOK_SECRET` es obligatorio para activar el endpoint.
 
 El precio del plan básico se toma de `MP_BASIC_PRICE_ARS` y Mercado Pago recibe `unit_price` en unidades monetarias, no centavos. Checkout y la interfaz usan siempre el precio vigente. Webhooks y reconciliación aceptan únicamente ese precio y los valores explícitos de `MP_ACCEPTED_PRICES_ARS`; nunca aceptan importes arbitrarios. Para una prueba temporal en producción, configurar `MP_BASIC_PRICE_ARS=100` y `MP_ACCEPTED_PRICES_ARS=100,10000` durante la ventana de pagos demorados; luego restaurar `MP_BASIC_PRICE_ARS=10000` y quitar `100` de la lista cuando no queden pagos pendientes por recibir o reconciliar. Nunca reescribir registros `Payment` históricos.
@@ -63,6 +78,12 @@ npm run build
 CI runs these checks on pushes and pull requests: [`.github/workflows/ci.yml`](./.github/workflows/ci.yml).
 
 Health/readiness: `GET /api/health`. Production operations and recovery guidance: [`docs/OPERATIONS.md`](./docs/OPERATIONS.md).
+
+La activación debe comenzar con un canary de un solo negocio. La configuración
+permanece apagada hasta validar MongoDB replica set, HTTPS, secretos, templates,
+alertas y una ejecución controlada. Para detener o revertir, deshabilitá los
+negocios y el scheduler; los turnos y el envío manual por `wa.me` continúan
+disponibles.
 
 ## Roadmap comercial
 

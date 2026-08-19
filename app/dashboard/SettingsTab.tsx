@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import MessagingSettingsCard from './MessagingSettingsCard';
 
 type Settings = {
   id: string;
@@ -286,6 +287,8 @@ export default function SettingsTab() {
           </div>
         </div>
       </header>
+
+      <MessagingSettingsCard />
 
       <form onSubmit={handleSave} className="space-y-5">
         <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5 sm:p-6" aria-labelledby="public-page-title">

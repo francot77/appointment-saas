@@ -6,6 +6,9 @@ import { Appointment } from '@/lib/models/Appointment';
 import { Service } from '@/lib/models/Service';
 import { Business } from '@/lib/models/Business';
 import { apiError } from '@/lib/apiError';
+import { MessageJob } from '@/lib/models/MessageJob';
+import { integrateAppointmentMessaging } from '@/lib/messaging/appointmentLifecycle';
+import { loadMessagingSettings } from '@/lib/messaging/connection';
 
 type Params = { params: Promise<{ token: string }> };
 
@@ -128,6 +131,7 @@ export async function PATCH(req: NextRequest, props: Params) {
 
     if (action === 'cancel') {
       update.status = 'cancelled';
+      update.$inc = { messagingVersion: 1 };
     } else if (action === 'reschedule') {
       const { newDate, newStartTime } = body as {
         newDate?: string;
@@ -182,6 +186,7 @@ export async function PATCH(req: NextRequest, props: Params) {
       update.date = newDate;
       update.startTime = newStartTime;
       update.endTime = newEndTime;
+      update.$inc = { messagingVersion: 1 };
 
       // el status lo dejamos igual (si estaba confirmado, sigue confirmado)
     } else {
@@ -193,6 +198,19 @@ export async function PATCH(req: NextRequest, props: Params) {
       update,
       { new: true }
     ).lean();
+
+    if (updated) {
+      await integrateAppointmentMessaging({
+        ...await loadMessagingSettings(String(updated.businessId)),
+        messageJobModel: MessageJob,
+        businessId: String(updated.businessId),
+        appointmentId: String(updated._id),
+        messagingVersion: typeof updated.messagingVersion === 'number' ? updated.messagingVersion : 1,
+        recipient: updated.clientPhone,
+        startAt: new Date(`${updated.date}T${updated.startTime}:00`),
+        event: action === 'cancel' ? 'cancelled' : 'rescheduled',
+      });
+    }
 
     return NextResponse.json(
       {

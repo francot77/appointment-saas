@@ -18,6 +18,8 @@ const AppointmentSchema = new Schema(
     notes: { type: String },
     reminderSent: { type: Boolean, default: false },
     lastReminderAt: { type: Date },
+    // New appointments start at one; legacy documents without this field are treated as version zero.
+    messagingVersion: { type: Number, default: 1, min: 0 },
 
     // para reprogramar vía magic link
     rescheduleToken: { type: String, default: null },

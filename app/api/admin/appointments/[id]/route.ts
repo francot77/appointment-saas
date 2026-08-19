@@ -11,6 +11,9 @@ import { ScheduleDay } from '@/lib/models/ScheduleDay';
 import { getCurrentBusiness } from '@/lib/currentBusiness';
 import { apiError } from '@/lib/apiError';
 import { date as validateDate, time as validateTime } from '@/lib/validation';
+import { MessageJob } from '@/lib/models/MessageJob';
+import { integrateAppointmentMessaging } from '@/lib/messaging/appointmentLifecycle';
+import { loadMessagingSettings } from '@/lib/messaging/connection';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -140,6 +143,7 @@ export async function PATCH(req: NextRequest, props: Params) {
       expectedStatus = 'request';
       newStatus = 'confirmed';
       update.status = newStatus;
+      update.$inc = { messagingVersion: 1 };
 
       // 🔑 Generar o reutilizar token del cliente
       let clientToken = appt.clientToken as string | undefined;
@@ -186,6 +190,7 @@ export async function PATCH(req: NextRequest, props: Params) {
       expectedStatus = 'confirmed';
       newStatus = 'cancelled';
       update.status = newStatus;
+      update.$inc = { messagingVersion: 1 };
       waMessage =
         `Hola ${clientName}, cancelamos tu turno para ${serviceName} ` +
         `el ${date} a las ${time}. Si querés, podés pedir otro horario desde el link de turnos.`;
@@ -315,9 +320,23 @@ export async function PATCH(req: NextRequest, props: Params) {
 
           const result = await Appointment.findOneAndUpdate(
             { _id: id, businessId: business._id, status: { $in: ['request', 'confirmed'] } },
-            { date: newDate, startTime: newStartTime, endTime: newEndTime },
+            { $set: { date: newDate, startTime: newStartTime, endTime: newEndTime }, $inc: { messagingVersion: 1 } },
             { new: true, session }
           ).lean();
+
+          if (result) {
+            await integrateAppointmentMessaging({
+              ...await loadMessagingSettings(String(business._id)),
+              messageJobModel: MessageJob,
+              session,
+              businessId: String(business._id),
+              appointmentId: String(result._id),
+              messagingVersion: typeof result.messagingVersion === 'number' ? result.messagingVersion : 1,
+              recipient: result.clientPhone,
+              startAt: new Date(`${result.date}T${result.startTime}:00`),
+              event: 'rescheduled',
+            });
+          }
 
           await releaseLock();
           if (!result) {
@@ -362,6 +381,19 @@ export async function PATCH(req: NextRequest, props: Params) {
 
     if (!updated) {
       return apiError('Este turno ya no está disponible para esa acción', 409, 'CONFLICT');
+    }
+
+    if (action === 'confirm' || action === 'cancel') {
+      await integrateAppointmentMessaging({
+        ...await loadMessagingSettings(String(business._id)),
+        messageJobModel: MessageJob,
+        businessId: String(business._id),
+        appointmentId: String(updated._id),
+        messagingVersion: typeof updated.messagingVersion === 'number' ? updated.messagingVersion : 1,
+        recipient: updated.clientPhone,
+        startAt: new Date(`${updated.date}T${updated.startTime}:00`),
+        event: action === 'confirm' ? 'confirmed' : 'cancelled',
+      });
     }
 
     const waUrl = waMessage
