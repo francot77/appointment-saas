@@ -6,6 +6,7 @@ import { rangesOverlap, timeToMinutes, minutesToTime } from '@/lib/time';
 import { date, email, positiveInteger, time } from '@/lib/validation';
 import { validateSlug } from '@/lib/slug';
 import { publicBookingRateLimit } from '@/lib/publicRateLimit';
+import { getSeoBaseUrl } from '@/lib/seo';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -100,6 +101,20 @@ describe('billing payment configuration', () => {
     vi.stubEnv('NODE_ENV', 'test');
     vi.stubEnv('APP_URL', 'https://payments.example.test/');
     expect(getPublicAppUrl()).toBe('https://payments.example.test');
+  });
+
+  it('uses the safe local SEO URL outside production when no URL is configured', () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', '');
+    vi.stubEnv('APP_URL', '');
+    expect(getSeoBaseUrl()).toBe('http://localhost:3000');
+  });
+
+  it('fails closed for SEO URLs in production', () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('NEXT_PUBLIC_APP_URL', '');
+    vi.stubEnv('APP_URL', '');
+    expect(() => getSeoBaseUrl()).toThrow('PUBLIC_APP_URL_NOT_CONFIGURED');
   });
 });
 

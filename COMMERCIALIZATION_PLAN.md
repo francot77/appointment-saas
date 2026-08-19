@@ -60,6 +60,30 @@ FezTime has public booking, authenticated business management, MongoDB persisten
 | P1 | Material conversion, trust, or support risk | Complete before broad launch; can follow a private pilot |
 | P2 | Scale, polish, or expansion | Post-launch unless evidence promotes it |
 
+## Technical SEO Foundation
+
+**Outcome:** Make real public business pages discoverable without exposing private, transactional, or invalid tenant URLs.
+
+**Decisions:**
+
+- `app/sitemap.ts` emits the homepage and current valid slugs for `trial` and `active` businesses only. It does not emit booking, dashboard, billing, auth, magic-link, confirmation, API, development, or reserved routes.
+- `app/robots.ts` allows public pages, disallows private route families, and points crawlers to `<APP_URL>/sitemap.xml`.
+- `/<slug>` is indexable and receives dynamic title, description, canonical, Open Graph/Twitter data, and conservative Organization JSON-LD from real business/settings fields.
+- `/<slug>/turnos` remains reachable for customers but is `noindex` and canonicalizes to `/<slug>` because it is a transactional step, not a distinct discovery page.
+- Auth, dashboard, billing, magic-link, confirmation, rescheduling, and generic booking routes are `noindex`.
+- `NEXT_PUBLIC_APP_URL` or `APP_URL` is required in production and must be a public non-localhost URL. Search Console setup and sitemap submission remain deployment tasks.
+
+**Acceptance criteria:**
+
+- [ ] Production serves a valid `robots.txt` with the configured sitemap URL and no localhost references.
+- [ ] Production serves a valid sitemap containing only the homepage and valid public business landing URLs.
+- [ ] A real public business landing renders unique metadata, a canonical URL, and escaped JSON-LD without fabricated claims.
+- [ ] A missing business preserves `notFound` behavior and is not indexable.
+- [ ] Private and transactional routes emit `noindex`; booking pages do not compete with the public landing.
+- [ ] Search Console property is verified and the production sitemap is submitted after deployment.
+
+**Rollback boundary:** Remove `app/sitemap.ts`, `app/robots.ts`, `lib/seo.ts`, the SEO metadata/JSON-LD additions in the scoped route files, and the SEO documentation entries. Preserve unrelated dirty-worktree changes.
+
 ## Copy Cleanup Work Unit
 
 **Outcome:** Replace developer-oriented and internal status wording in visible owner/customer surfaces with clear Spanish copy, without changing identifiers, API contracts, logs, or technical documentation.

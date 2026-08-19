@@ -1,5 +1,11 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Reservar turno',
+  robots: { index: false, follow: true },
+};
 
 export default function TurnosPage() {
   const slug = (process.env.NEXT_PUBLIC_DEFAULT_SLUG || process.env.DEFAULT_SLUG)?.trim();

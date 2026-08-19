@@ -1,15 +1,33 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // app/[slug]/page.tsx
-import { notFound } from 'next/navigation';
+import type { Metadata } from 'next';
+import { notFound, redirect } from 'next/navigation';
 import dbConnect from '@/lib/db';
-import { Business } from '@/lib/models/Business';
+import { getBusinessBySlug } from '@/lib/getBusinessBySlug';
 import { Service } from '@/lib/models/Service';
 import { BusinessSettings } from '@/lib/models/BusinessSettings';
+import { getSeoBaseUrl } from '@/lib/seo';
 import TurnosClient from '../TurnosClient';
 
 export const dynamic = 'force-dynamic';
 
 type Props = { params: Promise<{ slug: string }> };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+  await dbConnect();
+  const business: any = await getBusinessBySlug(slug);
+  if (!business) return { title: 'Página no encontrada', robots: { index: false, follow: false } };
+  const currentSlug = business.slug || slug;
+  const name = String(business.name || 'Negocio').trim();
+  return {
+    title: `Reservar turno en ${name}`,
+    description: `Elegí un servicio, fecha y horario para solicitar un turno en ${name}.`,
+    robots: { index: false, follow: true },
+    alternates: { canonical: `/${currentSlug}` },
+    openGraph: { url: `${getSeoBaseUrl()}/${currentSlug}`, type: 'website' },
+  };
+}
 
 export default async function PublicBusinessPage(props: Props) {
   const params = await props.params;
@@ -17,8 +35,11 @@ export default async function PublicBusinessPage(props: Props) {
 
   await dbConnect();
 
-  const business = await Business.findOne({ slug }).lean();
+  const business = await getBusinessBySlug(slug);
   if (!business) notFound();
+  if ((business as any).slug && (business as any).slug !== slug) {
+    redirect(`/${(business as any).slug}/turnos`);
+  }
 
   // Servicios activos
   const servicesDocs = await Service.find({

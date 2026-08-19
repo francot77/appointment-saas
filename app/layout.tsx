@@ -1,8 +1,9 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import ServiceWorkerRegister from './ServiceWorkerRegister';
+import { getSeoBaseUrl } from '@/lib/seo';
 
-const siteUrl = 'https://feztime.app';
+const siteUrl = getSeoBaseUrl();
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -21,20 +22,28 @@ export const metadata: Metadata = {
     ]
   },
   description:
-    'Reservá turnos desde tu celular. Elegí servicio, fecha y horario y recibí la confirmación por WhatsApp.',
+    'Creá una página pública para tu negocio y recibí solicitudes de turnos online.',
+  robots: {
+    index: true,
+    follow: true,
+  },
+  alternates: {
+    canonical: '/',
+  },
   openGraph: {
     title: 'FezTime – Agenda online',
     description:
-      'Reservá turnos de forma simple: seleccioná servicio, fecha y horario desde tu celular.',
+      'Mostrá tus servicios, horarios y una forma clara de recibir solicitudes de turnos.',
     url: '/',
     siteName: 'FezTime',
     type: 'website',
+    images: [{ url: '/icon-512.png', width: 512, height: 512, alt: 'FezTime' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'FezTime – Agenda online',
-    description:
-      'Reservá turnos desde tu celular con confirmación por WhatsApp.',
+    description: 'Una página pública y una agenda simple para negocios que trabajan con turnos.',
+    images: ['/icon-512.png'],
   },
 };
 

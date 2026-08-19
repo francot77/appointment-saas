@@ -28,6 +28,15 @@ El precio del plan básico se toma de `MP_BASIC_PRICE_ARS` y Mercado Pago recibe
 
 En producción, `NEXT_PUBLIC_APP_URL` o `APP_URL` es obligatorio y debe ser una URL pública válida; no se permite localhost. Si `MP_BASIC_PRICE_ARS` falta o es inválido en producción, el checkout falla cerrado; una lista `MP_ACCEPTED_PRICES_ARS` malformada también se rechaza. En desarrollo y test se usa 10000 ARS como valor seguro cuando la variable no está configurada.
 
+## SEO técnico
+
+- `NEXT_PUBLIC_APP_URL` o `APP_URL` debe apuntar a la URL pública canónica en producción. El sitemap y `robots.txt` usan esa variable y no publican localhost en producción.
+- Sitemap: `<APP_URL>/sitemap.xml`. Incluye la homepage y páginas públicas de negocios con estado `trial` o `active` y slugs vigentes válidos.
+- `robots.txt`: `<APP_URL>/robots.txt`. Permite páginas públicas y bloquea dashboard, facturación, autenticación, APIs, magic links y rutas de desarrollo.
+- Las páginas públicas de negocio (`/<slug>`) tienen metadata dinámica, canonical, Open Graph/Twitter y JSON-LD basado únicamente en datos configurados. La página de reserva (`/<slug>/turnos`) no se indexa y canonicaliza a la landing para evitar duplicación.
+- Confirmaciones, reprogramaciones, magic links, autenticación, dashboard y facturación tienen `noindex`. La landing pública no tiene `noindex`.
+- Después del despliegue, verificar `sitemap.xml` y `robots.txt`, registrar la propiedad en Google Search Console y enviar el sitemap.
+
 Recomendado en producción:
 
 - `NEXTAUTH_SECRET`

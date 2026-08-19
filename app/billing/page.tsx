@@ -4,6 +4,12 @@ import BillingClient from './BillingClient';
 import { redirect } from 'next/navigation';
 import { getEffectiveBillingStatus } from '@/lib/billingEntitlements';
 import { getBasicPriceARS } from '@/lib/billingConfig';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Facturación',
+  robots: { index: false, follow: false },
+};
 
 export const dynamic = 'force-dynamic';
 
