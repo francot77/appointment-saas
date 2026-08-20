@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { removeSavedAppointmentByToken, saveAppointment } from '@/lib/clientAppointmentsStorage';
+import { Alert, EmptyState, LoadingState, Status } from '@/app/components/ui/feedback';
 type Service = {
   id: string;
   name: string;
@@ -268,11 +269,11 @@ export default function MagicLinkClient({ token }: Props) {
     !appt || ['cancelled', 'rejected'].includes(appt.status);
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 flex justify-center px-4 py-6">
+    <main className="min-h-screen bg-[var(--color-canvas)] text-[var(--color-content)] flex justify-center px-4 py-6">
       <div className="w-full max-w-md space-y-4">
         <header className="flex items-center gap-3 mb-2">
           <div
-            className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shadow-lg shadow-black/40"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shadow-sm"
             style={{ backgroundColor: businessColor, color: '#020617' }}
           >
             {appt?.business?.name
@@ -280,92 +281,81 @@ export default function MagicLinkClient({ token }: Props) {
               : 'T'}
           </div>
           <div>
-            <h1 className="text-sm font-semibold tracking-wide">
+            <h1 className="text-sm font-semibold tracking-wide text-[var(--color-content)]">
               {appt?.business?.name || 'Turno'}
             </h1>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-[var(--color-content-muted)]">
               Link para gestionar tu turno
             </p>
           </div>
         </header>
 
-        <section className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 space-y-3">
+        <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-4 space-y-3">
           {loading && (
-            <p className="text-xs text-slate-400">
-              Cargando datos del turno...
-            </p>
+            <LoadingState label="Cargando datos del turno..." />
           )}
 
           {error && (
-            <div className="space-y-2" role="alert" aria-live="assertive">
-              <p className="text-xs text-red-400">{error}</p>
-              {!appt && (
-                <button
-                  type="button"
-                  onClick={loadAppointment}
-                  className="text-xs font-medium text-slate-100 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
-                >
+            <Alert
+              tone="danger"
+              role="alert"
+              retry={!appt ? (
+                <button type="button" onClick={loadAppointment} className="text-xs font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]">
                   Intentar nuevamente
                 </button>
-              )}
-            </div>
+              ) : undefined}
+            >
+              {error}
+            </Alert>
           )}
 
           {!loading && !appt && !error && (
-            <p className="text-xs text-slate-400">
-              No se encontró información para este turno.
-            </p>
+            <EmptyState title="No se encontró información para este turno." />
           )}
 
           {appt && (
             <>
               <div className="space-y-1 text-xs">
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-[var(--color-content-muted)]">
                   Turno a nombre de{' '}
-                  <span className="text-slate-100 font-medium">
+                  <span className="text-[var(--color-content)] font-medium">
                     {appt.clientName}
                   </span>
                 </p>
                 <p>
-                  <span className="text-slate-400">Fecha: </span>
-                  <span className="text-slate-100 font-medium">
+                  <span className="text-[var(--color-content-muted)]">Fecha: </span>
+                  <span className="text-[var(--color-content)] font-medium">
                     {appt.date}
                   </span>
                 </p>
                 <p>
-                  <span className="text-slate-400">Horario: </span>
-                  <span className="text-slate-100 font-medium">
+                  <span className="text-[var(--color-content-muted)]">Horario: </span>
+                  <span className="text-[var(--color-content)] font-medium">
                     {appt.startTime} hs
                   </span>
                 </p>
                 {appt.service && (
                   <p>
-                    <span className="text-slate-400">Servicio: </span>
-                    <span className="text-slate-100 font-medium">
+                    <span className="text-[var(--color-content-muted)]">Servicio: </span>
+                    <span className="text-[var(--color-content)] font-medium">
                       {appt.service.name}
                     </span>
                   </p>
                 )}
                 {appt.status === 'confirmed' && (
-                  <p className="text-[11px] text-emerald-400 mt-1">
-                    Este turno está confirmado.
-                  </p>
+                  <Status tone="success" label="Confirmado" description="Este turno está confirmado." />
                 )}
                 {appt.status === 'request' && (
-                  <p className="text-[11px] text-slate-300 mt-1">
-                    Este turno está pendiente de confirmación.
-                  </p>
+                  <Status tone="warning" label="Pendiente de confirmación" description="Este turno está pendiente de confirmación." />
                 )}
                 {['cancelled', 'rejected'].includes(appt.status) && (
-                  <p className="text-[11px] text-red-400 mt-1">
-                     Este turno ya no está disponible.
-                  </p>
+                  <Status tone="danger" label="No disponible" description="Este turno ya no está disponible." />
                 )}
               </div>
 
               {appt.notes && (
-                <div className="mt-2 text-[11px] text-slate-300 bg-slate-950 border border-slate-800 rounded-lg p-2">
-                  <span className="text-slate-400">Notas: </span>
+                <div className="mt-2 text-[11px] text-[var(--color-content)] bg-[var(--color-surface-muted)] border border-[var(--color-border)] rounded-lg p-2">
+                  <span className="text-[var(--color-content-muted)]">Notas: </span>
                   {appt.notes}
                 </div>
               )}
@@ -375,23 +365,23 @@ export default function MagicLinkClient({ token }: Props) {
                   type="button"
                   disabled={saving || disabledByStatus}
                   onClick={handleCancel}
-                  className="w-full rounded-full py-2 text-xs font-medium border border-red-500/60 text-red-300 hover:bg-red-500/10 disabled:opacity-60"
+                  className="w-full rounded-full py-2 text-xs font-medium border border-[var(--color-danger-border)] text-[var(--color-danger-foreground)] hover:bg-[var(--color-danger-background)] disabled:opacity-60"
                 >
                   Cancelar turno
                 </button>
 
                 {!disabledByStatus && appt.service && appt.business && (
-                  <div className="mt-3 pt-3 border-t border-slate-800 space-y-2">
-                    <p className="text-xs font-medium text-slate-200">
+                  <div className="mt-3 pt-3 border-t border-[var(--color-border)] space-y-2">
+                    <p className="text-xs font-medium text-[var(--color-content)]">
                       Reprogramar turno
                     </p>
-                    <p className="text-[11px] text-slate-400">
+                    <p className="text-[11px] text-[var(--color-content-muted)]">
                       Elegí una nueva fecha y horario. Solo vas a ver los
                       horarios disponibles.
                     </p>
 
                     <div className="space-y-2">
-                      <label className="text-[11px] text-slate-300">
+                      <label className="text-[11px] text-[var(--color-content-muted)]">
                         Nueva fecha
                       </label>
                       <input
@@ -405,13 +395,13 @@ export default function MagicLinkClient({ token }: Props) {
                           setSuccessMessage(null);
                           setError(null);
                         }}
-                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+                        className="w-full bg-[var(--color-canvas)] border border-[var(--color-border)] rounded-lg px-3 py-1.5 text-xs text-[var(--color-content)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
                       />
                       <button
                         type="button"
                         onClick={loadSlots}
                         disabled={loadingSlots || !date}
-                        className="w-full rounded-full py-1.5 text-xs font-medium bg-slate-100 text-slate-900 disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+                        className="w-full rounded-full py-1.5 text-xs font-medium bg-[var(--color-action)] text-white disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
                       >
                         {loadingSlots
                           ? 'Buscando horarios...'
@@ -421,7 +411,7 @@ export default function MagicLinkClient({ token }: Props) {
 
                     {slots.length > 0 && (
                       <div className="space-y-2">
-                        <p className="text-[11px] text-slate-300">
+                        <p className="text-[11px] text-[var(--color-content-muted)]">
                           Elegí un nuevo horario
                         </p>
                         <div className="grid grid-cols-3 gap-2 text-xs">
@@ -434,10 +424,10 @@ export default function MagicLinkClient({ token }: Props) {
                                 key={slot.startTime}
                                 type="button"
                                 onClick={() => setSelectedSlot(slot)}
-                                className={`rounded-full py-1.5 border text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
+                                className={`rounded-full py-1.5 border text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] ${
                                   isSelected
-                                    ? 'border-indigo-400 bg-indigo-500 text-slate-900'
-                                    : 'border-slate-700 bg-slate-950 text-slate-100 hover:bg-slate-900'
+                                    ? 'border-[var(--color-action)] bg-[var(--color-action)] text-white'
+                                    : 'border-[var(--color-border)] bg-[var(--color-canvas)] text-[var(--color-content)] hover:bg-[var(--color-surface-muted)]'
                                 }`}
                               >
                                 {slot.startTime}
@@ -452,7 +442,7 @@ export default function MagicLinkClient({ token }: Props) {
                       type="button"
                       disabled={saving || !selectedSlot}
                       onClick={handleReschedule}
-                      className="w-full rounded-full py-2 text-xs font-medium shadow-md shadow-black/40 disabled:opacity-60"
+                      className="w-full rounded-full py-2 text-xs font-medium shadow-sm disabled:opacity-60"
                       style={{ backgroundColor: businessColor, color: '#020617' }}
                     >
                       {saving
@@ -464,9 +454,12 @@ export default function MagicLinkClient({ token }: Props) {
               </div>
 
               {successMessage && (
-                <p className="text-[11px] text-emerald-400 mt-2">
+                <Alert
+                  tone={successMessage.includes('No hay horarios') ? 'info' : 'success'}
+                  role="status"
+                >
                   {successMessage}
-                </p>
+                </Alert>
               )}
             </>
           )}

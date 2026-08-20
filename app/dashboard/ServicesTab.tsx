@@ -3,6 +3,12 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { BrandConfig, DEFAULT_BRAND } from './types';
+import {
+  Alert,
+  EmptyState,
+  LoadingState,
+  Status,
+} from '@/app/components/ui/feedback';
 
 type Service = {
   id: string;
@@ -213,26 +219,26 @@ export default function ServicesTab({ brand }: Props) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 bg-[var(--color-canvas)] text-[var(--color-content)]">
       {/* Encabezado */}
-      <section className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
+      <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-3 flex items-center justify-between">
         <div>
           <h2 className="text-sm font-semibold">Servicios</h2>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-[var(--color-content-muted)]">
             Configurá los servicios que ofrecés, precios y duración.
           </p>
         </div>
         <button
           type="button"
           onClick={resetForm}
-          className="text-[11px] px-3 py-1 rounded-full border border-slate-700 hover:bg-slate-800"
+          className="text-[11px] px-3 py-1 rounded-full border border-[var(--color-border)] hover:bg-[var(--color-surface-muted)]"
         >
           Nuevo
         </button>
       </section>
 
       {/* Formulario */}
-      <section className="bg-slate-900 border border-slate-800 rounded-xl p-3">
+      <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-3">
         <h3 className="text-xs font-semibold mb-2">
           {editing ? 'Editar servicio' : 'Nuevo servicio'}
         </h3>
@@ -240,12 +246,12 @@ export default function ServicesTab({ brand }: Props) {
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
-              <label htmlFor="service-name" className="text-xs text-slate-400">
+              <label htmlFor="service-name" className="text-xs text-[var(--color-content-muted)]">
                 Nombre
               </label>
               <input
                 id="service-name"
-                className="bg-slate-950 border border-slate-700 rounded-md px-2 py-1 text-sm"
+                className="bg-[var(--color-surface-muted)] border border-[var(--color-border)] rounded-md px-2 py-1 text-sm"
                 value={form.name}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, name: e.target.value }))
@@ -255,14 +261,14 @@ export default function ServicesTab({ brand }: Props) {
             </div>
 
             <div className="flex flex-col gap-1">
-              <label htmlFor="service-price" className="text-xs text-slate-400">
+              <label htmlFor="service-price" className="text-xs text-[var(--color-content-muted)]">
                 Precio (ARS)
               </label>
               <input
                 type="number"
                 id="service-price"
                 min={0}
-                className="bg-slate-950 border border-slate-700 rounded-md px-2 py-1 text-sm"
+                className="bg-[var(--color-surface-muted)] border border-[var(--color-border)] rounded-md px-2 py-1 text-sm"
                 value={form.price}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, price: e.target.value }))
@@ -272,7 +278,7 @@ export default function ServicesTab({ brand }: Props) {
             </div>
 
             <div className="flex flex-col gap-1">
-              <label htmlFor="service-duration" className="text-xs text-slate-400">
+              <label htmlFor="service-duration" className="text-xs text-[var(--color-content-muted)]">
                 Duración (minutos)
               </label>
               <input
@@ -280,7 +286,7 @@ export default function ServicesTab({ brand }: Props) {
                 id="service-duration"
                 min={5}
                 step={5}
-                className="bg-slate-950 border border-slate-700 rounded-md px-2 py-1 text-sm"
+                className="bg-[var(--color-surface-muted)] border border-[var(--color-border)] rounded-md px-2 py-1 text-sm"
                 value={form.durationMinutes}
                 onChange={(e) =>
                   setForm((f) => ({
@@ -293,14 +299,14 @@ export default function ServicesTab({ brand }: Props) {
             </div>
 
             <div className="flex flex-col gap-1">
-              <label htmlFor="service-color" className="text-xs text-slate-400">
+              <label htmlFor="service-color" className="text-xs text-[var(--color-content-muted)]">
                 Color (opcional)
               </label>
               <div className="flex items-center gap-2">
                 <input
                   type="color"
                   aria-label="Color del servicio"
-                  className="h-8 w-8 rounded-md border border-slate-700 bg-slate-950"
+                  className="h-8 w-8 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-muted)]"
                   value={form.color || '#3b82f6'}
                   onChange={(e) =>
                     setForm((f) => ({ ...f, color: e.target.value }))
@@ -308,7 +314,7 @@ export default function ServicesTab({ brand }: Props) {
                 />
                 <input
                   id="service-color"
-                  className="flex-1 bg-slate-950 border border-slate-700 rounded-md px-2 py-1 text-sm"
+                  className="flex-1 bg-[var(--color-surface-muted)] border border-[var(--color-border)] rounded-md px-2 py-1 text-sm"
                   value={form.color}
                   placeholder="#38bdf8"
                   onChange={(e) =>
@@ -320,14 +326,14 @@ export default function ServicesTab({ brand }: Props) {
           </div>
 
           <div className="flex items-center justify-between pt-1">
-            <label className="flex items-center gap-2 text-[11px] text-slate-300">
+            <label className="flex items-center gap-2 text-[11px] text-[var(--color-content-muted)]">
               <input
                 type="checkbox"
                 checked={form.isActive}
                 onChange={(e) =>
                   setForm((f) => ({ ...f, isActive: e.target.checked }))
                 }
-                className="h-3 w-3 rounded border-slate-700 bg-slate-950"
+                className="h-3 w-3 rounded border-[var(--color-border)] bg-[var(--color-surface-muted)]"
               />
               Servicio activo (visible para los clientes)
             </label>
@@ -337,7 +343,7 @@ export default function ServicesTab({ brand }: Props) {
                 <button
                   type="button"
                   onClick={resetForm}
-                  className="text-xs px-3 py-1 rounded-md border border-slate-600 text-slate-200 hover:bg-slate-800"
+                  className="text-xs px-3 py-1 rounded-md border border-[var(--color-border)] text-[var(--color-content)] hover:bg-[var(--color-surface-muted)]"
                 >
                   Cancelar
                 </button>
@@ -363,35 +369,31 @@ export default function ServicesTab({ brand }: Props) {
           </div>
 
           {error && (
-            <p className="text-[11px] text-red-400 mt-1" role="alert" aria-live="assertive">{error}</p>
+            <Alert tone="danger" role="alert">{error}</Alert>
           )}
         </form>
       </section>
 
       {/* Lista */}
-      <section className="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-2">
+      <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl p-3 space-y-2">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-semibold">
             Servicios configurados
           </h3>
           {loading && (
-            <span className="text-[11px] text-slate-400" role="status" aria-live="polite">
-              Cargando...
-            </span>
+            <LoadingState label="Cargando..." />
           )}
         </div>
 
         {services.length === 0 && !loading && !error && (
-          <p className="text-[11px] text-slate-400">
-             Todavía no agregaste servicios. Creá el primero para que tus clientes puedan elegirlo.
-          </p>
+          <EmptyState title="Todavía no agregaste servicios. Creá el primero para que tus clientes puedan elegirlo." />
         )}
 
         <div className="space-y-2">
           {services.map((s) => (
             <div
               key={s.id}
-              className="bg-slate-950 rounded-lg px-3 py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border border-slate-800"
+              className="bg-[var(--color-surface-muted)] rounded-lg px-3 py-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border border-[var(--color-border)]"
             >
               <div className="flex items-start gap-2">
                 <div
@@ -405,21 +407,16 @@ export default function ServicesTab({ brand }: Props) {
                     <span className="text-sm font-semibold">
                       {s.name}
                     </span>
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-[11px] text-[var(--color-content-muted)]">
                       {s.durationMinutes} min
                     </span>
-                    <span className="text-[11px] text-slate-300">
+                    <span className="text-[11px] text-[var(--color-content-muted)]">
                       ${s.price}
                     </span>
-                    <span
-                      className={`text-[10px] px-2 py-0.5 rounded-full border ${
-                        s.isActive
-                          ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/40'
-                          : 'bg-slate-800 text-slate-300 border-slate-600'
-                      }`}
-                    >
-                      {s.isActive ? 'Activo' : 'Oculto'}
-                    </span>
+                    <Status
+                      tone={s.isActive ? 'success' : 'info'}
+                      label={s.isActive ? 'Activo' : 'Oculto'}
+                    />
                   </div>
                 </div>
               </div>
@@ -428,21 +425,21 @@ export default function ServicesTab({ brand }: Props) {
                 <button
                   type="button"
                   onClick={() => toggleActive(s)}
-                  className="text-[11px] px-2.5 py-1 rounded-full border border-slate-600 text-slate-100 hover:bg-slate-800"
+                  className="text-[11px] px-2.5 py-1 rounded-full border border-[var(--color-border)] text-[var(--color-content)] hover:bg-[var(--color-surface)]"
                 >
                   {s.isActive ? 'Ocultar' : 'Mostrar'}
                 </button>
                 <button
                   type="button"
                   onClick={() => startEdit(s)}
-                  className="text-[11px] px-2.5 py-1 rounded-full border border-slate-600 text-slate-100 hover:bg-slate-800"
+                  className="text-[11px] px-2.5 py-1 rounded-full border border-[var(--color-border)] text-[var(--color-content)] hover:bg-[var(--color-surface)]"
                 >
                   Editar
                 </button>
                 <button
                   type="button"
                   onClick={(event) => handleDelete(s, event.currentTarget)}
-                  className="text-[11px] px-2.5 py-1 rounded-full border border-red-500/60 text-red-300 hover:bg-red-500/10"
+                  className="text-[11px] px-2.5 py-1 rounded-full border border-[var(--color-danger-border)] text-[var(--color-danger-foreground)] hover:bg-[var(--color-danger-background)]"
                 >
                   Eliminar
                 </button>

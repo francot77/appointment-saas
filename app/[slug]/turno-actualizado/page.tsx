@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import dbConnect from '@/lib/db';
 import { getBusinessBySlug } from '@/lib/getBusinessBySlug';
+import { Alert } from '@/app/components/ui/feedback';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,8 +58,8 @@ export default async function TurnoActualizadoPage(props: Props) {
     businessName.trim().charAt(0).toUpperCase() || 'T';
 
   return (
-    <main className="min-h-screen relative bg-slate-950 text-slate-100 flex items-center justify-center px-4">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+    <main className="min-h-screen relative bg-[var(--color-canvas)] text-[var(--color-content)] flex items-center justify-center px-4 py-8">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-10">
         <div
           className="absolute -top-32 -left-24 w-72 h-72 rounded-full opacity-35 blur-3xl"
           style={{ backgroundColor: primaryColor }}
@@ -70,7 +71,7 @@ export default async function TurnoActualizadoPage(props: Props) {
       </div>
 
       <div className="relative z-10 w-full max-w-md">
-        <section className="bg-slate-950/80 border border-slate-800 rounded-2xl px-5 py-6 shadow-2xl shadow-black/60 backdrop-blur space-y-4">
+        <section className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl px-5 py-6 shadow-xl space-y-4">
           <header className="flex items-center gap-3">
             <div
               className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shadow-lg shadow-black/40"
@@ -79,44 +80,44 @@ export default async function TurnoActualizadoPage(props: Props) {
               {initial}
             </div>
             <div>
-              <h1 className="text-sm font-semibold tracking-wide">
+              <h1 className="text-sm font-semibold tracking-wide text-[var(--color-content)]">
                 {businessName}
               </h1>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-[var(--color-content-muted)]">
                 Turno reprogramado
               </p>
             </div>
           </header>
 
-          <div className="space-y-2 mt-2">
+          <Alert tone="success" role="status">
             <h2 className="text-lg font-semibold">
               ¡Tu turno fue reprogramado! 🔁
             </h2>
-            <p className="text-xs text-slate-300">
+            <p className="text-xs text-[var(--color-content-muted)]">
               Actualizamos tu turno con el nuevo horario que elegiste.
               Te va a llegar la confirmación final por WhatsApp si el negocio lo usa para avisos.
             </p>
-          </div>
+          </Alert>
 
           {(newDate || newTime || service) && (
-            <div className="mt-2 border border-slate-800 rounded-lg p-3 bg-slate-950/80 text-xs space-y-2">
-              <p className="text-[11px] text-slate-400">
+            <div className="mt-2 border border-[var(--color-border)] rounded-lg p-3 bg-[var(--color-surface-muted)] text-xs space-y-2">
+              <p className="text-[11px] text-[var(--color-content-muted)]">
                 Resumen de tu turno:
               </p>
 
               {service && (
                 <p>
-                  <span className="text-slate-400">Servicio: </span>
-                  <span className="text-slate-100 font-medium">
+                  <span className="text-[var(--color-content-muted)]">Servicio: </span>
+                  <span className="text-[var(--color-content)] font-medium">
                     {service}
                   </span>
                 </p>
               )}
 
               {(oldDate || oldTime) && (
-                <div className="text-[11px] text-slate-400">
+                <div className="text-[11px] text-[var(--color-content-muted)]">
                   <p className="mb-1">Horario anterior:</p>
-                  <p className="text-slate-200">
+                  <p className="text-[var(--color-content)]">
                     {oldDate && <span>{oldDate}</span>}
                     {oldDate && oldTime && ' · '}
                     {oldTime && <span>{oldTime} hs</span>}
@@ -125,9 +126,9 @@ export default async function TurnoActualizadoPage(props: Props) {
               )}
 
               {(newDate || newTime) && (
-                <div className="text-[11px] text-slate-400">
+                <div className="text-[11px] text-[var(--color-content-muted)]">
                   <p className="mb-1">Nuevo horario:</p>
-                  <p className="text-slate-200 font-medium">
+                  <p className="text-[var(--color-content)] font-medium">
                     {newDate && <span>{newDate}</span>}
                     {newDate && newTime && ' · '}
                     {newTime && <span>{newTime} hs</span>}
@@ -137,7 +138,7 @@ export default async function TurnoActualizadoPage(props: Props) {
             </div>
           )}
 
-          <div className="text-[11px] text-slate-400 space-y-1">
+          <div className="text-[11px] text-[var(--color-content-muted)] space-y-1">
             <p>
               Si más adelante necesitás cambiarlo de nuevo o cancelar,
               podés volver a usar el link que recibiste por WhatsApp.
