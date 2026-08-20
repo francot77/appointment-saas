@@ -1,15 +1,15 @@
-import type { MessagingProvider, ProviderMessageIntent, ProviderSendResult } from '@/lib/messaging/providers/types';
+import type { MessagingProvider, ProviderMessageIntent, ProviderSendResult, ProviderCertainty } from '@/lib/messaging/providers/types';
 
 type Fetcher = (input: string | URL, init?: RequestInit) => Promise<Response>;
 type MetaOptions = { accessToken: string; phoneNumberId: string; fetcher?: Fetcher; timeoutMs?: number; graphVersion?: string };
 
 export class MetaProviderError extends Error {
-  constructor(public readonly code: string, message: string, public readonly retryable: boolean, public readonly status?: number) {
+  constructor(public readonly code: string, message: string, public readonly retryable: boolean, public readonly status?: number, public readonly certainty: Exclude<ProviderCertainty, 'accepted'> = 'definite_failure') {
     super(message);
     this.name = 'MetaProviderError';
   }
 }
-export class MetaProviderTimeoutError extends MetaProviderError { constructor() { super('TIMEOUT', 'Meta request timed out', true); } }
+export class MetaProviderTimeoutError extends MetaProviderError { constructor() { super('TIMEOUT', 'Meta request timed out', true, undefined, 'ambiguous'); } }
 export class MetaProviderClientError extends MetaProviderError { constructor(status: number) { super('PROVIDER_CLIENT_ERROR', `Meta rejected the request (${status})`, false, status); } }
 export class MetaProviderServerError extends MetaProviderError { constructor(status: number) { super('PROVIDER_SERVER_ERROR', `Meta service failed (${status})`, true, status); } }
 export class MetaProviderRateLimitError extends MetaProviderError { constructor() { super('RATE_LIMITED', 'Meta rate limit reached', true, 429); } }
@@ -55,11 +55,11 @@ export class MetaWhatsAppCloudProvider implements MessagingProvider {
       const payload = await response.json() as { messages?: Array<{ id?: string }> };
       const providerMessageId = payload.messages?.[0]?.id;
       if (!providerMessageId) throw new MetaProviderError('PROVIDER_CLIENT_ERROR', 'Meta response did not include a message id', false, response.status);
-      return { providerMessageId };
+      return { providerMessageId, certainty: 'accepted' };
     } catch (error) {
       if (error instanceof MetaProviderError) throw error;
       if (error instanceof Error && error.name === 'AbortError') throw new MetaProviderTimeoutError();
-      throw new MetaProviderError('NETWORK_ERROR', 'Meta request failed before a response was received', true);
+      throw new MetaProviderError('NETWORK_ERROR', 'Meta request failed before a response was received', true, undefined, 'ambiguous');
     } finally { clearTimeout(timer); }
   }
 }

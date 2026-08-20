@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local development tooling
+/.atl/
+/.codegraph/
+/.playwright-mcp/
+
+# local generated artifacts
+/landing-current.png
+/favicon-for-app.zip

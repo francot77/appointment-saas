@@ -16,11 +16,18 @@ const BusinessSchema = new Schema(
         end: { type: String, default: '19:00' },
       },
       slotSizeMinutes: { type: Number, default: 30 },
-    },plan: {
+    },
+    plan: {
       type: String,
-      enum: ['basic'],
+      enum: ['basic', 'premium', 'enterprise'],
       default: 'basic',
     },
+    timezone: {
+      type: String,
+      default: 'America/Argentina/Buenos_Aires',
+    },
+    planAssignedBy: { type: String, default: null },
+    planAssignedAt: { type: Date, default: null },
     status: {
       type: String,
       enum: ['trial', 'active', 'expired', 'past_due', 'cancelled'],

@@ -124,6 +124,22 @@ describe('appointment lifecycle messaging integration', () => {
     expect(updates).toHaveLength(1);
   });
 
+  it('keeps appointment scheduling available when automatic usage is exhausted', async () => {
+    const { dependencies, inserts } = deps();
+
+    const result = await integrateAppointmentMessaging({
+      ...appointment,
+      event: 'confirmed',
+      enabled: true,
+      remindersEnabled: false,
+      ...dependencies,
+    });
+
+    expect(result.scheduled).toBe(1);
+    expect(inserts).toHaveLength(1);
+    // Quota is checked by the worker immediately before provider dispatch, not here.
+  });
+
   it('invalidates obsolete versions before scheduling only current-version reschedule work', async () => {
     const { dependencies, inserts, updates } = deps();
 

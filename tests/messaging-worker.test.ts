@@ -291,3 +291,252 @@ describe('messaging scheduler contract', () => {
     expect(result.processed).toBe(MAX_WORK_PER_RUN);
   });
 });
+
+describe('automatic usage admission', () => {
+  const baseJob = { _id: 'job-auto', businessId: 'basic', appointmentId: 'appt', messagingVersion: 1, state: 'leased', leaseToken: 'lease', attempts: 0, idempotencyKey: 'usage-job' };
+  const appointmentModel = { findOne: async () => ({ messagingVersion: 1, status: 'confirmed' }) };
+  const usageContext = { businessId: 'basic', periodKey: '2026-08', timezone: 'America/Argentina/Buenos_Aires', limit: 1, now: new Date(), model: {
+    updateOne: async () => ({}),
+    findOne: async () => ({ businessId: 'basic', periodKey: '2026-08', timezone: 'America/Argentina/Buenos_Aires', acceptedCount: 0, allocations: [] }),
+    findOneAndUpdate: async (_filter: any, update: any) => ({ businessId: 'basic', periodKey: '2026-08', timezone: 'America/Argentina/Buenos_Aires', acceptedCount: update.$inc?.acceptedCount ?? 0, allocations: [{ jobKey: 'usage-job', jobId: 'job-auto', state: update.$pull ? 'released' : update.$set ? (update.$set['allocations.$[allocation].state'] ?? 'reserved') : 'reserved', reservedAt: new Date() }] }),
+  } } as any;
+
+  function jobModel(updates: any[], override: any = {}) {
+    return { findOne: async () => ({ ...baseJob, ...override }), updateOne: async (_filter: any, update: any) => { updates.push(update); return { matchedCount: 1, modifiedCount: 1 }; } };
+  }
+
+  it('blocks a Basic automatic job before the provider and leaves manual jobs outside usage enforcement', async () => {
+    const updates: any[] = [];
+    let sends = 0;
+    const result = await processClaimedMessageJob({
+      job: baseJob, jobModel: jobModel(updates), appointmentModel,
+      admitAutomatic: async () => ({ status: 'blocked', reason: 'entitlement_denied', audit: { effectivePlan: 'basic', usageAllowance: 0 } }),
+      send: async () => { sends += 1; },
+    });
+    expect(result).toMatchObject({ state: 'dead', failureCode: 'entitlement_denied' });
+    expect(sends).toBe(0);
+    expect(updates[0].$set.usageAllowance).toBe(0);
+
+    const connectionBlocked = await processClaimedMessageJob({
+      job: baseJob, jobModel: jobModel([]), appointmentModel,
+      admitAutomatic: async () => ({ status: 'blocked' as const, reason: 'connection_blocked' as const }),
+      send: async () => { sends += 1; },
+    });
+    expect(connectionBlocked).toMatchObject({ state: 'dead', failureCode: 'connection_blocked' });
+
+    const manual = await processClaimedMessageJob({
+      job: { ...baseJob, automatic: false }, jobModel: jobModel([], { automatic: false }), appointmentModel,
+      admitAutomatic: async () => { throw new Error('manual flow must not admit usage'); },
+      send: async () => ({ providerMessageId: 'manual-provider' }),
+    });
+    expect(manual.state).toBe('sent');
+  });
+
+  it('projects a complete auditable model for a quota-blocked automatic job', async () => {
+    const updates: any[] = [];
+    let sends = 0;
+    const result = await processClaimedMessageJob({
+      job: { ...baseJob, provider: 'meta_whatsapp_cloud', providerMessageId: null },
+      jobModel: jobModel(updates, { provider: 'meta_whatsapp_cloud', providerMessageId: null }),
+      appointmentModel,
+      admitAutomatic: async () => ({
+        status: 'blocked' as const,
+        reason: 'quota_exceeded' as const,
+        audit: {
+          usagePeriodKey: '2026-08',
+          usageTimezone: 'America/Argentina/Buenos_Aires',
+          effectivePlan: 'premium',
+          usageAllowance: 100,
+          usageAccepted: 100,
+          usageUncertain: 0,
+        },
+      }),
+      send: async () => { sends += 1; },
+    });
+
+    expect(result).toMatchObject({
+      _id: 'job-auto',
+      businessId: 'basic',
+      idempotencyKey: 'usage-job',
+      state: 'dead',
+      failureCode: 'quota_exceeded',
+      usagePeriodKey: '2026-08',
+      usageTimezone: 'America/Argentina/Buenos_Aires',
+      effectivePlan: 'premium',
+      usageAllowance: 100,
+      usageOutcome: 'quota_exceeded',
+      usageAccepted: 100,
+      usageUncertain: 0,
+      provider: 'meta_whatsapp_cloud',
+      providerMessageId: null,
+    });
+    expect(updates[0].$set).toMatchObject({
+      usagePeriodKey: '2026-08',
+      usageTimezone: 'America/Argentina/Buenos_Aires',
+      effectivePlan: 'premium',
+      usageAllowance: 100,
+      usageOutcome: 'quota_exceeded',
+      usageAccepted: 100,
+      usageUncertain: 0,
+    });
+    expect(sends).toBe(0);
+  });
+
+  it('finalizes an accepted allocation on lease recovery without calling Meta again', async () => {
+    let sends = 0;
+    const result = await processClaimedMessageJob({
+      job: { ...baseJob, dispatchStartedAt: new Date() }, jobModel: jobModel([], { dispatchStartedAt: new Date() }), appointmentModel,
+      admitAutomatic: async () => ({ status: 'accepted' as const, audit: { usageOutcome: 'accepted', providerMessageId: 'wamid.recovered' } }),
+      send: async () => { sends += 1; },
+    });
+    expect(result).toMatchObject({ state: 'sent', replay: true, usageOutcome: 'accepted' });
+    expect(sends).toBe(0);
+  });
+
+  it('releases a reserved slot on definite provider failure and quarantines timeout uncertainty', async () => {
+    const definiteUpdates: any[] = [];
+    const admitted = async () => ({ status: 'admitted' as const, context: usageContext, audit: { usagePeriodKey: '2026-08', usageTimezone: usageContext.timezone } });
+    const definite = await processClaimedMessageJob({
+      job: baseJob, jobModel: jobModel(definiteUpdates), appointmentModel, admitAutomatic: admitted,
+      send: async () => { throw Object.assign(new Error('429'), { status: 429 }); },
+    });
+    expect(definite).toMatchObject({ state: 'retry_wait', usageOutcome: 'released' });
+
+    const uncertainUpdates: any[] = [];
+    const uncertain = await processClaimedMessageJob({
+      job: baseJob, jobModel: jobModel(uncertainUpdates), appointmentModel, admitAutomatic: admitted,
+      send: async () => { throw Object.assign(new Error('timeout'), { certainty: 'ambiguous' }); },
+    });
+    expect(uncertain).toMatchObject({ state: 'dead', failureCode: 'delivery_unknown', usageOutcome: 'delivery_unknown' });
+  });
+
+  it('keeps an uncertain reservation when usage commit fails after provider acceptance', async () => {
+    const updates: any[] = [];
+    const allocation = { jobKey: 'usage-job', jobId: 'job-auto', state: 'reserved', reservedAt: new Date() };
+    let usageMutations = 0;
+    const usageModel = {
+      updateOne: async () => ({}),
+      findOne: async () => ({ businessId: 'basic', periodKey: '2026-08', timezone: 'UTC', acceptedCount: 0, allocations: [allocation] }),
+      findOneAndUpdate: async (_filter: any, update: any) => {
+        usageMutations += 1;
+        if (usageMutations === 1) throw new Error('usage commit unavailable');
+        allocation.state = update.$set['allocations.$[allocation].state'];
+        return { businessId: 'basic', periodKey: '2026-08', timezone: 'UTC', acceptedCount: 0, allocations: [allocation] };
+      },
+    } as any;
+    let sends = 0;
+    const result = await processClaimedMessageJob({
+      job: baseJob,
+      jobModel: jobModel(updates),
+      appointmentModel,
+      admitAutomatic: async () => ({ status: 'admitted' as const, context: { ...usageContext, model: usageModel }, reservationOwned: true, audit: { usageOutcome: 'reserved' } }),
+      send: async () => { sends += 1; return { providerMessageId: 'wamid.accepted-before-commit-failure' }; },
+    });
+
+    expect(result).toMatchObject({
+      state: 'dead',
+      failureCode: 'delivery_unknown',
+      usageOutcome: 'delivery_unknown',
+      providerMessageId: 'wamid.accepted-before-commit-failure',
+    });
+    expect(sends).toBe(1);
+    expect(usageMutations).toBe(2);
+    expect(allocation.state).toBe('uncertain');
+    expect(updates.at(-1).$set).not.toMatchObject({ state: 'retry_wait' });
+    expect(updates.at(-1).$set).not.toHaveProperty('dispatchStartedAt', null);
+  });
+
+  it('releases its reserved slot when invalidated before dispatch starts', async () => {
+    const allocation = [
+      { jobKey: 'usage-job', jobId: 'job-auto', state: 'reserved', reservedAt: new Date() },
+      { jobKey: 'other-uncertain', jobId: 'job-uncertain', state: 'uncertain', reservedAt: new Date() },
+      { jobKey: 'other-accepted', jobId: 'job-accepted', state: 'accepted', reservedAt: new Date() },
+    ];
+    const usageModel = {
+      updateOne: async () => ({}),
+      findOne: async () => ({ businessId: 'basic', periodKey: '2026-08', timezone: 'UTC', acceptedCount: 1, allocations: allocation }),
+      findOneAndUpdate: async (filter: any, update: any) => {
+        expect(filter['allocations.jobKey']).toBe('usage-job');
+        expect(filter.allocations.$elemMatch.state.$in).toEqual(['reserved']);
+        expect(update.$pull.allocations).toEqual({ jobKey: 'usage-job', state: 'reserved' });
+        const index = allocation.findIndex((item) => item.jobKey === update.$pull.allocations.jobKey && item.state === 'reserved');
+        if (index === -1) return null;
+        allocation.splice(index, 1);
+        return { businessId: 'basic', periodKey: '2026-08', timezone: 'UTC', acceptedCount: 1, allocations: allocation };
+      },
+    } as any;
+    const updates: any[] = [];
+    const result = await processClaimedMessageJob({
+      job: baseJob,
+      jobModel: {
+        findOne: async () => ({ ...baseJob }),
+        updateOne: async (_filter: any, update: any) => {
+          updates.push(update);
+          return update.$set.dispatchStartedAt ? { matchedCount: 0, modifiedCount: 0 } : { matchedCount: 1, modifiedCount: 1 };
+        },
+      },
+      appointmentModel,
+      admitAutomatic: async () => ({ status: 'admitted' as const, context: { ...usageContext, model: usageModel }, reservationOwned: true }),
+      send: async () => { throw new Error('provider must not be called'); },
+    });
+
+    expect(result).toMatchObject({ state: 'invalidated' });
+    expect(updates).toHaveLength(1);
+    expect(allocation).toEqual(expect.arrayContaining([
+      expect.objectContaining({ jobKey: 'other-uncertain', state: 'uncertain' }),
+      expect.objectContaining({ jobKey: 'other-accepted', state: 'accepted' }),
+    ]));
+    expect(allocation).not.toEqual(expect.arrayContaining([expect.objectContaining({ jobKey: 'usage-job' })]));
+  });
+
+  it('releases its owned reserved slot when appointment invalidates after dispatch starts', async () => {
+    const allocation = [
+      { jobKey: 'usage-job', jobId: 'job-auto', state: 'reserved', reservedAt: new Date() },
+      { jobKey: 'other-uncertain', jobId: 'job-uncertain', state: 'uncertain', reservedAt: new Date() },
+      { jobKey: 'other-accepted', jobId: 'job-accepted', state: 'accepted', reservedAt: new Date() },
+    ];
+    const usageModel = {
+      updateOne: async () => ({}),
+      findOne: async () => ({ businessId: 'basic', periodKey: '2026-08', timezone: 'UTC', acceptedCount: 1, allocations: allocation }),
+      findOneAndUpdate: async (filter: any, update: any) => {
+        expect(filter['allocations.jobKey']).toBe('usage-job');
+        expect(filter.allocations.$elemMatch.state.$in).toEqual(['reserved']);
+        expect(update.$pull.allocations).toEqual({ jobKey: 'usage-job', state: 'reserved' });
+        const index = allocation.findIndex((item) => item.jobKey === update.$pull.allocations.jobKey && item.state === 'reserved');
+        if (index === -1) return null;
+        allocation.splice(index, 1);
+        return { businessId: 'basic', periodKey: '2026-08', timezone: 'UTC', acceptedCount: 1, allocations: allocation };
+      },
+    } as any;
+    const updates: any[] = [];
+    let appointmentReads = 0;
+    const result = await processClaimedMessageJob({
+      job: baseJob,
+      jobModel: {
+        findOne: async () => ({ ...baseJob }),
+        updateOne: async (_filter: any, update: any) => {
+          updates.push(update);
+          return { matchedCount: 1, modifiedCount: 1 };
+        },
+      },
+      appointmentModel: { findOne: async () => {
+        appointmentReads += 1;
+        return appointmentReads === 1
+          ? { messagingVersion: 1, status: 'confirmed' }
+          : { messagingVersion: 2, status: 'confirmed' };
+      } },
+      admitAutomatic: async () => ({ status: 'admitted' as const, context: { ...usageContext, model: usageModel }, reservationOwned: true }),
+      send: async () => { throw new Error('provider must not be called'); },
+    });
+
+    expect(result).toMatchObject({ state: 'invalidated' });
+    expect(updates).toHaveLength(2);
+    expect(updates[0].$set.dispatchStartedAt).toBeDefined();
+    expect(updates[1].$set).toMatchObject({ state: 'invalidated', leaseToken: null, leaseExpiresAt: null });
+    expect(allocation).toEqual(expect.arrayContaining([
+      expect.objectContaining({ jobKey: 'other-uncertain', state: 'uncertain' }),
+      expect.objectContaining({ jobKey: 'other-accepted', state: 'accepted' }),
+    ]));
+    expect(allocation).not.toEqual(expect.arrayContaining([expect.objectContaining({ jobKey: 'usage-job' })]));
+  });
+});

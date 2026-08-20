@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
   normalizeMessagingSettings,
   type MessagingSettingsPayload,
   type MessagingSettingsView,
 } from '@/lib/messaging/settings-contract';
+import { presentAutomaticMessaging, type EntitlementReadModel } from '@/lib/entitlementPresentation';
 
 const EVENTS = [
   ['confirmed', 'Confirmation template'],
@@ -28,6 +30,7 @@ export default function MessagingSettingsCard({ className = '' }: Props) {
   const [enabled, setEnabled] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [entitlement, setEntitlement] = useState<EntitlementReadModel | null>(null);
 
   async function load() {
     try {
@@ -46,6 +49,7 @@ export default function MessagingSettingsCard({ className = '' }: Props) {
   }
 
   useEffect(() => { void load(); }, []);
+  useEffect(() => { void fetch('/api/admin/entitlements').then(async (response) => { if (!response.ok) throw new Error('entitlements'); setEntitlement(await response.json()); }).catch(() => undefined); }, []);
 
   async function save() {
     if (!payload) return;
@@ -76,6 +80,8 @@ export default function MessagingSettingsCard({ className = '' }: Props) {
     }
   }
 
+  const automaticMessaging = entitlement ? presentAutomaticMessaging(entitlement) : null;
+
   return (
     <section className={`rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 ${className}`} aria-labelledby="messaging-settings-title">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -91,6 +97,8 @@ export default function MessagingSettingsCard({ className = '' }: Props) {
 
       {error && <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{error}</p>}
 
+      {automaticMessaging && entitlement && <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm" role="status"><div className="flex items-center justify-between gap-3"><span className="font-semibold text-slate-800">{automaticMessaging.label}</span><span className="text-xs text-slate-500">{entitlement.automaticMessaging.accepted} / {entitlement.automaticMessaging.limit} · {entitlement.automaticMessaging.period}</span></div><p className="mt-1 leading-5 text-slate-600">{automaticMessaging.detail}</p>{automaticMessaging.upgrade && <Link className="mt-2 inline-block font-semibold text-indigo-700 underline" href="/billing">Upgrade plan</Link>}</div>}
+
       {view && payload && (
         <>
           <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
@@ -98,7 +106,7 @@ export default function MessagingSettingsCard({ className = '' }: Props) {
             <div><dt className="text-slate-500">WABA ID</dt><dd className="font-medium text-slate-900">{view.wabaId}</dd></div>
           </dl>
           <label className="mt-5 flex items-center gap-3 text-sm font-medium text-slate-800">
-            <input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />
+            <input type="checkbox" checked={enabled} disabled={automaticMessaging?.state === 'unavailable'} onChange={(event) => setEnabled(event.target.checked)} />
             Enable appointment confirmations and reminders
           </label>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
