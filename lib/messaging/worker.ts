@@ -131,6 +131,23 @@ export async function processClaimedMessageJob(input: {
   try {
     const response = await input.send(currentJob);
     acceptedProviderMessageId = response?.providerMessageId;
+    if (admission?.context && !response?.providerMessageId) {
+      const usageJob = { jobKey: currentJob.idempotencyKey ?? String(currentJob._id), jobId: String(currentJob._id) };
+      const result = await markUncertain(admission.context, usageJob);
+      const update = {
+        state: 'dead',
+        failureCode: 'delivery_unknown',
+        attempts: (currentJob.attempts ?? 0) + 1,
+        ...admission.audit,
+        ...usageAudit(result.usage),
+        usageOutcome: 'delivery_unknown',
+        providerMessageId: null,
+        leaseToken: null,
+        leaseExpiresAt: null,
+      };
+      await input.jobModel.updateOne({ _id: currentJob._id, state: 'leased', leaseToken: currentJob.leaseToken }, { $set: update });
+      return { ...currentJob, ...update };
+    }
     if (admission?.context && response?.providerMessageId) {
       const result = await commit(admission.context, { jobKey: currentJob.idempotencyKey ?? String(currentJob._id), jobId: String(currentJob._id) }, response.providerMessageId);
       if (!['committed', 'replayed'].includes(result.status)) {

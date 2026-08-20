@@ -3,14 +3,7 @@ import dbConnect from '@/lib/db';
 import { User } from '@/lib/models/User';
 import { Business } from '@/lib/models/Business';
 import { hash } from 'bcryptjs';
-
-function slugify(name: string) {
-  return name
-    .toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)+/g, '');
-}
+import { slugifyName, validateSlug } from '@/lib/slug';
 
 export async function POST(req: NextRequest) {
   await dbConnect();
@@ -28,27 +21,34 @@ export async function POST(req: NextRequest) {
   const passwordHash = await hash(password, 10);
   const user = await User.create({ email, name, passwordHash });
 
-  const slugBase = slugify(businessName);
+  const baseCandidates = [slugifyName(businessName), 'negocio'];
+  const slugBase = baseCandidates.find((c) => validateSlug(c).ok) ?? 'negocio';
+
   let slug = slugBase;
   let i = 1;
-  while (await Business.findOne({ slug })) {
+  while (
+    (await Business.findOne({
+      $or: [{ slug }, { previousSlugs: slug }],
+    }).select({ _id: 1 })) ||
+    !validateSlug(slug).ok
+  ) {
     slug = `${slugBase}-${i++}`;
   }
 
   const now = new Date();
-const trialDays = 14;
-const paidUntil = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
+  const trialDays = 14;
+  const paidUntil = new Date(now.getTime() + trialDays * 24 * 60 * 60 * 1000);
 
-await Business.create({
-  ownerUserId: user._id,
-  name: businessName,
-  phone,
-  address,
-  slug,
-  plan: 'basic',
-  status: 'trial',
-  paidUntil,
-});
+  await Business.create({
+    ownerUserId: user._id,
+    name: businessName,
+    phone,
+    address,
+    slug,
+    plan: 'basic',
+    status: 'trial',
+    paidUntil,
+  });
 
 
   return NextResponse.json({ ok: true }, { status: 201 });

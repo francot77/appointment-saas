@@ -67,12 +67,27 @@ export async function GET(req: NextRequest) {
       businessId: business._id,
       date,
       status: { $in: ['request', 'confirmed'] },
-    }).lean();
+    })
+      .select({ startTime: 1, endTime: 1 })
+      .lean();
 
-    const booked = appointments.map((a: any) => ({
-      start: parseTimeToMinutes(a.startTime),
-      end: parseTimeToMinutes(a.endTime),
-    }));
+    const bookedRaw = appointments
+      .map((a: any) => ({
+        start: parseTimeToMinutes(a.startTime),
+        end: parseTimeToMinutes(a.endTime),
+      }))
+      .filter((r) => Number.isFinite(r.start) && Number.isFinite(r.end) && r.start < r.end)
+      .sort((a, b) => a.start - b.start);
+
+    const booked: { start: number; end: number }[] = [];
+    for (const r of bookedRaw) {
+      const prev = booked[booked.length - 1];
+      if (!prev || r.start > prev.end) {
+        booked.push({ start: r.start, end: r.end });
+      } else if (r.end > prev.end) {
+        prev.end = r.end;
+      }
+    }
 
     const slots: { startTime: string; endTime: string }[] = [];
 
@@ -80,27 +95,36 @@ export async function GET(req: NextRequest) {
     const todayStr = now.toISOString().slice(0, 10);
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
-    for (const block of (schedule as any).blocks) {
-      if (block.enabled === false) continue;
-      const blockStart = parseTimeToMinutes(block.start);
-      const blockEnd = parseTimeToMinutes(block.end);
-      if (Number.isNaN(blockStart) || Number.isNaN(blockEnd)) continue;
+    const blocks = ((schedule as any).blocks as any[])
+      .filter((b) => b && b.enabled !== false)
+      .map((b) => ({
+        start: parseTimeToMinutes(b.start),
+        end: parseTimeToMinutes(b.end),
+      }))
+      .filter((b) => Number.isFinite(b.start) && Number.isFinite(b.end) && b.start < b.end)
+      .sort((a, b) => a.start - b.start);
 
-      let cursor = blockStart;
+    let bookedIdx = 0;
+
+    for (const block of blocks) {
+      let cursor = block.start;
+      const blockEnd = block.end;
 
       while (cursor + duration <= blockEnd) {
         const slotStart = cursor;
         const slotEnd = cursor + duration;
 
-        // si es hoy, no ofrecer turnos que ya pasaron
         if (date === todayStr && slotEnd <= nowMinutes) {
           cursor += duration;
           continue;
         }
 
-        const overlaps = booked.some(
-          (b) => slotStart < b.end && slotEnd > b.start
-        );
+        while (bookedIdx < booked.length && booked[bookedIdx].end <= slotStart) {
+          bookedIdx++;
+        }
+
+        const overlaps =
+          bookedIdx < booked.length && booked[bookedIdx].start < slotEnd;
 
         if (!overlaps) {
           slots.push({
@@ -109,7 +133,7 @@ export async function GET(req: NextRequest) {
           });
         }
 
-        cursor += duration; // paso del tamaño de la duración del servicio
+        cursor += duration;
       }
     }
 

@@ -1,28 +1,60 @@
 // app/api/admin/appointments/route.ts
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
-import dbConnect from '@/lib/db';
 import { Appointment } from '@/lib/models/Appointment';
 import { Service } from '@/lib/models/Service';
 import { getCurrentBusiness } from '@/lib/currentBusiness';
 import { apiError } from '@/lib/apiError';
 
+function isValidDateStr(date: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(date);
+}
+
+function toDateStr(d: Date) {
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const business = await getCurrentBusiness({ requireEntitlement: true });
-    await dbConnect();
 
     const { searchParams } = new URL(req.url);
     const date = searchParams.get('date');      // opcional
+    const from = searchParams.get('from');      // opcional
+    const to = searchParams.get('to');          // opcional
     const status = searchParams.get('status');  // 'request' | 'confirmed' | 'all'
 
     const query: any = {
       businessId: business._id,
     };
 
-    // si viene date, filtramos por día; si no, devolvemos todos los del negocio
     if (date) {
+      if (!isValidDateStr(date)) {
+        return apiError('Formato de fecha inválido (YYYY-MM-DD)', 400);
+      }
       query.date = date;
+    } else if (from || to) {
+      if (!from || !to) {
+        return apiError('from y to son requeridos', 400);
+      }
+      if (!isValidDateStr(from) || !isValidDateStr(to)) {
+        return apiError('Formato de fecha inválido (YYYY-MM-DD)', 400);
+      }
+      if (from > to) {
+        return apiError('from no puede ser mayor que to', 400);
+      }
+      query.date = { $gte: from, $lte: to };
+    } else {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const fromDefault = toDateStr(now);
+      const toDt = new Date(now);
+      toDt.setDate(toDt.getDate() + 30);
+      const toDefault = toDateStr(toDt);
+      query.date = { $gte: fromDefault, $lte: toDefault };
     }
 
     // si status != 'all', filtramos

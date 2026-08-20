@@ -6,13 +6,13 @@ import { getCurrentBusiness } from '@/lib/currentBusiness';
 import { apiError } from '@/lib/apiError';
 import { hexColor, nonEmptyString, nonnegativePrice, positiveInteger } from '@/lib/validation';
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const business = await getCurrentBusiness({ requireEntitlement: true });
     await dbConnect();
 
-    const services = await Service.find({ businessId: business._id, active: true })
-      .sort({ name: 1 })
+    const services = await Service.find({ businessId: business._id })
+      .sort({ active: -1, name: 1 })
       .lean();
 
     return NextResponse.json({ services });

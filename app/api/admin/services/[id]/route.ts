@@ -1,8 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import { Service } from '@/lib/models/Service';
-import mongoose from 'mongoose';
 import dbConnect from '@/lib/db';
+import { getCurrentBusiness } from '@/lib/currentBusiness';
+import { apiError } from '@/lib/apiError';
+import { hexColor, mongoId, nonEmptyString, nonnegativePrice, positiveInteger } from '@/lib/validation';
 
 export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -74,4 +76,34 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
     return apiError('Internal error', 500);
   }
 }
+
+export async function DELETE(_req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const id = params.id;
+
+  const validId = mongoId(id);
+  if (!validId.ok) return apiError(validId.error, 400);
+
+  try {
+    const business = await getCurrentBusiness({ requireEntitlement: true });
+    await dbConnect();
+
+    const service = await Service.findOneAndUpdate(
+      { _id: validId.value, businessId: business._id },
+      { $set: { active: false } },
+      { new: true }
+    ).lean();
+
+    if (!service) {
+      return apiError('Servicio no encontrado', 404);
+    }
+
+    return NextResponse.json({ ok: true }, { status: 200 });
+  } catch (err: any) {
+    if (err.message === 'UNAUTHORIZED') return apiError('Unauthorized', 401);
+    if (err.message === 'NO_BUSINESS') return apiError('No business found', 403);
     if (err.message === 'BILLING_REQUIRED') return apiError('Billing required', 402, 'FORBIDDEN');
+    console.error('DELETE /admin/services/[id] error', err);
+    return apiError('Internal error', 500);
+  }
+}

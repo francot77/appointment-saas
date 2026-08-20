@@ -446,6 +446,32 @@ describe('automatic usage admission', () => {
     expect(updates.at(-1).$set).not.toHaveProperty('dispatchStartedAt', null);
   });
 
+  it('quarantines an automatic success without a provider message id', async () => {
+    const updates: any[] = [];
+    const allocation = { jobKey: 'usage-job', jobId: 'job-auto', state: 'reserved', reservedAt: new Date() };
+    const usageModel = {
+      updateOne: async () => ({}),
+      findOne: async () => ({ businessId: 'basic', periodKey: '2026-08', timezone: 'UTC', acceptedCount: 0, allocations: [allocation] }),
+      findOneAndUpdate: async (_filter: any, update: any) => {
+        allocation.state = update.$set['allocations.$[allocation].state'];
+        return { businessId: 'basic', periodKey: '2026-08', timezone: 'UTC', acceptedCount: 0, allocations: [allocation] };
+      },
+    } as any;
+
+    const result = await processClaimedMessageJob({
+      job: baseJob,
+      jobModel: jobModel(updates),
+      appointmentModel,
+      admitAutomatic: async () => ({ status: 'admitted' as const, context: { ...usageContext, model: usageModel }, reservationOwned: true, audit: { usageOutcome: 'reserved' } }),
+      send: async () => undefined,
+    });
+
+    expect(result).toMatchObject({ state: 'dead', failureCode: 'delivery_unknown', usageOutcome: 'delivery_unknown', providerMessageId: null });
+    expect(allocation.state).toBe('uncertain');
+    expect(updates.at(-1).$set).toMatchObject({ state: 'dead', failureCode: 'delivery_unknown', usageOutcome: 'delivery_unknown', providerMessageId: null });
+    expect(updates.at(-1).$set.state).not.toBe('sent');
+  });
+
   it('releases its reserved slot when invalidated before dispatch starts', async () => {
     const allocation = [
       { jobKey: 'usage-job', jobId: 'job-auto', state: 'reserved', reservedAt: new Date() },

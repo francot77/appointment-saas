@@ -33,6 +33,20 @@ export default function ServicesTab({ brand }: Props) {
     isActive: true,
   });
   const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Service | null>(null);
+  const deleteDialogRef = useRef<HTMLDialogElement>(null);
+  const deleteCancelRef = useRef<HTMLButtonElement>(null);
+  const deleteTriggerRef = useRef<HTMLButtonElement>(null);
+
+  function serviceError(action: 'load' | 'save' | 'update' | 'delete') {
+    return action === 'load'
+      ? 'No pudimos cargar tus servicios. Intentá nuevamente.'
+      : action === 'save'
+        ? 'No pudimos guardar el servicio. Revisá los datos e intentá nuevamente.'
+        : action === 'update'
+          ? 'No pudimos actualizar la visibilidad del servicio. Intentá nuevamente.'
+          : 'No pudimos eliminar el servicio. Intentá nuevamente.';
+  }
 
   useEffect(() => {
     loadServices();
@@ -57,23 +71,23 @@ export default function ServicesTab({ brand }: Props) {
       const json = await res.json();
 
       if (!res.ok) {
-        throw new Error(json.error || 'Error cargando servicios');
+        throw new Error('load');
       }
 
       const list: Service[] =
         json.services?.map((s: any) => ({
-          id: s.id || s._id,
+          id: String(s.id || s._id),
           name: s.name,
           price: s.price,
           durationMinutes: s.durationMinutes,
           color: s.color,
-          isActive: s.isActive ?? true,
+          isActive: s.active ?? true,
         })) ?? [];
 
       setServices(list);
     } catch (e: any) {
       console.error(e);
-      setError(e.message || 'Error cargando servicios');
+      setError(serviceError('load'));
       setServices([]);
     } finally {
       setLoading(false);
@@ -102,7 +116,7 @@ export default function ServicesTab({ brand }: Props) {
         price: Number(form.price),
         durationMinutes: Number(form.durationMinutes),
         color: form.color || undefined,
-        isActive: form.isActive,
+        active: form.isActive,
       };
 
       const url = editing
@@ -110,22 +124,22 @@ export default function ServicesTab({ brand }: Props) {
         : '/api/admin/services';
 
       const res = await fetch(url, {
-        method: editing ? 'PUT' : 'POST',
+        method: editing ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
 
-      const json = await res.json();
+      await res.json();
 
       if (!res.ok) {
-        throw new Error(json.error || 'Error guardando servicio');
+        throw new Error('save');
       }
 
       await loadServices();
       resetForm();
     } catch (e: any) {
       console.error(e);
-      setError(e.message || 'Error guardando servicio');
+      setError(serviceError('save'));
     } finally {
       setSaving(false);
     }
@@ -136,12 +150,12 @@ export default function ServicesTab({ brand }: Props) {
       const res = await fetch(`/api/admin/services/${service.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: !service.isActive }),
+        body: JSON.stringify({ active: !service.isActive }),
       });
 
-      const json = await res.json();
+      await res.json();
       if (!res.ok) {
-        throw new Error(json.error || 'Error actualizando servicio');
+        throw new Error('update');
       }
 
       setServices((prev) =>
@@ -151,7 +165,7 @@ export default function ServicesTab({ brand }: Props) {
       );
     } catch (e) {
       console.error(e);
-      setError(e instanceof Error ? e.message : 'Error actualizando servicio');
+      setError(serviceError('update'));
     }
   }
 
@@ -183,9 +197,9 @@ export default function ServicesTab({ brand }: Props) {
       const res = await fetch(`/api/admin/services/${service.id}`, {
         method: 'DELETE',
       });
-      const json = await res.json();
+      await res.json();
       if (!res.ok) {
-        throw new Error(json.error || 'Error eliminando servicio');
+        throw new Error('delete');
       }
 
       await loadServices();
@@ -194,7 +208,7 @@ export default function ServicesTab({ brand }: Props) {
       }
     } catch (e) {
       console.error(e);
-      setError(e instanceof Error ? e.message : 'Error eliminando servicio');
+      setError(serviceError('delete'));
     }
   }
 
