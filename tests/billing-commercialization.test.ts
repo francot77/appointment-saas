@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isValidPaymentTransition, toBillingPaymentDTO, validateProviderPayment } from '@/lib/billingReconciliation';
+import { calculatePaymentPeriodTo, isValidPaymentTransition, toBillingPaymentDTO, validateProviderPayment } from '@/lib/billingReconciliation';
 import { Payment } from '@/lib/models/Payments';
 import { buildBasicPreferenceBody, createMercadoPagoClients, createMercadoPagoConfig, getMercadoPagoErrorStatus, MERCADO_PAGO_TIMEOUT_MS } from '@/lib/mercadoPago';
 
@@ -66,11 +66,45 @@ describe('billing commercialization integrity', () => {
     expect(() => validateProviderPayment({ ...validPayment, currency_id: 'USD' }, businessId)).toThrow('PAYMENT_INVALID');
   });
 
-  it('keeps terminal states terminal and permits pending recovery', () => {
+  it('accepts an approved payment when optional provider items are absent', () => {
+    expect(validateProviderPayment({ ...validPayment, additional_info: undefined }, businessId, {
+      businessId,
+      amount: 10000,
+      currency: 'ARS',
+      attemptReference: `${businessId}:attempt-1`,
+      productId: 'basic-monthly',
+    }).nextStatus).toBe('approved');
+  });
+
+  it('uses the tenant-scoped local attempt as the product and amount authority', () => {
+    const localAttempt = {
+      businessId,
+      amount: 10000,
+      currency: 'ARS',
+      attemptReference: `${businessId}:attempt-1`,
+      preferenceId: 'preference-1',
+      productId: 'basic-monthly',
+    };
+    expect(validateProviderPayment({ ...validPayment, preference_id: 'preference-1' }, businessId, localAttempt)).toBeTruthy();
+    expect(() => validateProviderPayment({ ...validPayment, transaction_amount: 999 }, businessId, localAttempt)).toThrow('PAYMENT_INVALID');
+    expect(() => validateProviderPayment({ ...validPayment, external_reference: `${businessId}:other-attempt` }, businessId, localAttempt)).toThrow('PAYMENT_INVALID');
+    expect(() => validateProviderPayment({ ...validPayment, preference_id: 'other-preference' }, businessId, localAttempt)).toThrow('PAYMENT_INVALID');
+    expect(() => validateProviderPayment({ ...validPayment, id: undefined }, businessId, localAttempt)).toThrow('PAYMENT_INVALID');
+    expect(() => validateProviderPayment({ ...validPayment }, businessId, { ...localAttempt, productId: 'premium-monthly' })).toThrow('PAYMENT_INVALID');
+  });
+
+  it('keeps duplicate and out-of-order terminal states idempotent', () => {
     expect(isValidPaymentTransition(undefined, 'pending')).toBe(true);
     expect(isValidPaymentTransition('pending', 'approved')).toBe(true);
+    expect(isValidPaymentTransition('approved', 'approved')).toBe(false);
     expect(isValidPaymentTransition('approved', 'rejected')).toBe(false);
     expect(isValidPaymentTransition('rejected', 'approved')).toBe(false);
+  });
+
+  it('extends a trial or pending period from the later local paidUntil date', () => {
+    const now = new Date('2026-01-01T00:00:00.000Z');
+    expect(calculatePaymentPeriodTo(new Date('2026-01-15T00:00:00.000Z'), now)).toEqual(new Date('2026-02-14T00:00:00.000Z'));
+    expect(calculatePaymentPeriodTo(new Date('2025-12-15T00:00:00.000Z'), now)).toEqual(new Date('2026-01-31T00:00:00.000Z'));
   });
 
   it('rejects a provider reference belonging to another tenant', () => {

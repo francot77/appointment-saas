@@ -78,6 +78,7 @@ describe('billing payment configuration', () => {
     expect(getAcceptedBasicPricesARS()).toEqual([10000, 100]);
 
     const payment = (amount: number) => ({
+      id: 'payment-1',
       external_reference: '507f1f77bcf86cd799439011',
       transaction_amount: amount,
       currency_id: 'ARS',

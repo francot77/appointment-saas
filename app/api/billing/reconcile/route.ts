@@ -19,6 +19,7 @@ function isTransactionUnsupported(error: unknown) {
 export async function POST(req: NextRequest) {
   try {
     const business = await getCurrentBusiness();
+    if (!business) return apiError('Unauthorized', 401, 'UNAUTHORIZED');
     const body = await req.json().catch(() => ({})) as { paymentId?: unknown; attemptReference?: unknown; preferenceId?: unknown };
     const paymentId = typeof body.paymentId === 'string' ? body.paymentId.trim() : '';
     const attemptReference = typeof body.attemptReference === 'string' ? body.attemptReference.trim() : '';
@@ -38,7 +39,11 @@ export async function POST(req: NextRequest) {
       providerPayment = search?.results?.[0];
     }
     if (!providerPayment) return apiError('Pago todavía no disponible', 404, 'NOT_FOUND');
-    const reconciled = await reconcileProviderPayment({ ...providerPayment, id: providerPayment.id }, String(business._id));
+    const reconciled = await reconcileProviderPayment(
+      { ...providerPayment, id: providerPayment.id },
+      String(business._id),
+      local,
+    );
     if (!reconciled) return apiError('Pago no encontrado', 404, 'NOT_FOUND');
     return NextResponse.json({ payment: toBillingPaymentDTO(reconciled) });
   } catch (error) {

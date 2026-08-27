@@ -17,6 +17,15 @@ export type ProviderPayment = {
   };
 };
 
+export type LocalPaymentAttempt = {
+  businessId: unknown;
+  amount: number;
+  currency?: string;
+  attemptReference: string;
+  preferenceId?: string | null;
+  productId: string;
+};
+
 export type BillingPaymentDTO = {
   id: string;
   status: 'approved' | 'pending' | 'rejected';
@@ -38,15 +47,45 @@ function normalizeStatus(status: string) {
   return status === 'approved' ? 'approved' as const : status === 'rejected' || status === 'cancelled' ? 'rejected' as const : 'pending' as const;
 }
 
-export function validateProviderPayment(payment: ProviderPayment, expectedBusinessId?: string) {
+export function calculatePaymentPeriodTo(paidUntil: Date | undefined, now: Date, periodMonths = 1) {
+  const currentPaidUntil = paidUntil && paidUntil > now ? paidUntil : now;
+  return new Date(currentPaidUntil.getTime() + periodMonths * 30 * 24 * 60 * 60 * 1000);
+}
+
+export function validateProviderPayment(
+  payment: ProviderPayment,
+  expectedBusinessId?: string,
+  localAttempt?: LocalPaymentAttempt,
+) {
+  const paymentId = typeof payment.id === 'string' || typeof payment.id === 'number'
+    ? String(payment.id).trim()
+    : '';
   const reference = payment.external_reference || '';
   const businessId = reference.split(':', 1)[0];
-  const item = payment.additional_info?.items?.find((candidate) => candidate.id === BASIC_PRODUCT_ID);
+  const items = payment.additional_info?.items;
+  const basicItem = items?.find((candidate) => candidate.id === BASIC_PRODUCT_ID);
   const acceptedPricesARS = getAcceptedBasicPricesARS();
-  if (!isSupportedProviderStatus(payment.status) || !businessId || !Types.ObjectId.isValid(businessId) ||
+  const hasValidReference = Boolean(reference) && businessId && Types.ObjectId.isValid(businessId);
+  const hasValidAmount = typeof payment.transaction_amount === 'number' &&
+    acceptedPricesARS.includes(payment.transaction_amount);
+  const localMatches = !localAttempt || (
+    String(localAttempt.businessId) === businessId &&
+    localAttempt.attemptReference === reference &&
+    localAttempt.productId === BASIC_PRODUCT_ID &&
+    localAttempt.currency === 'ARS' &&
+    acceptedPricesARS.includes(localAttempt.amount) &&
+    payment.transaction_amount === localAttempt.amount &&
+    (!localAttempt.preferenceId || !payment.preference_id || localAttempt.preferenceId === payment.preference_id)
+  );
+  const optionalItemMatches = !items || (
+    basicItem !== undefined &&
+    basicItem.unit_price === payment.transaction_amount &&
+    basicItem.quantity === 1
+  );
+  const hasProductEvidence = localAttempt?.productId === BASIC_PRODUCT_ID || basicItem !== undefined;
+  if (!paymentId || !isSupportedProviderStatus(payment.status) || !hasValidReference ||
       (expectedBusinessId && businessId !== expectedBusinessId) || payment.currency_id !== 'ARS' ||
-      !acceptedPricesARS.includes(payment.transaction_amount as number) || !item ||
-      !acceptedPricesARS.includes(item.unit_price as number) || item.quantity !== 1) {
+      !hasValidAmount || !hasProductEvidence || !localMatches || !optionalItemMatches) {
     throw new Error('PAYMENT_INVALID');
   }
   return { businessId, attemptReference: reference, nextStatus: normalizeStatus(payment.status as string) };
@@ -58,20 +97,38 @@ export function isValidPaymentTransition(current: string | undefined, incoming: 
   return incoming === 'approved' || incoming === 'pending' || incoming === 'rejected';
 }
 
-export async function reconcileProviderPayment(payment: ProviderPayment, expectedBusinessId?: string) {
-  const { businessId, attemptReference, nextStatus } = validateProviderPayment(payment, expectedBusinessId);
+export async function reconcileProviderPayment(
+  payment: ProviderPayment,
+  expectedBusinessId?: string,
+  knownAttempt?: LocalPaymentAttempt,
+) {
   const paymentId = typeof payment.id === 'string' || typeof payment.id === 'number'
     ? String(payment.id).trim()
     : '';
   if (!paymentId) throw new Error('PAYMENT_INVALID');
+
+  const reference = payment.external_reference || '';
+  const businessId = reference.split(':', 1)[0];
+  const localAttempt = knownAttempt ?? (reference && businessId && Types.ObjectId.isValid(businessId)
+    ? await Payment.findOne({ businessId, attemptReference: reference }).lean()
+    : undefined);
+  if (!localAttempt) throw new Error('PAYMENT_INVALID');
+  const { businessId: validatedBusinessId, attemptReference, nextStatus } = validateProviderPayment(
+    payment,
+    expectedBusinessId,
+    localAttempt,
+  );
 
   const connection = await Payment.db;
   const session = await connection.startSession();
   const now = new Date();
   try {
     const applyPayment = () => session.withTransaction(async () => {
-      const existing = await Payment.findOne({ $or: [{ mpPaymentId: paymentId }, { attemptReference }] }).session(session).lean();
-      const business = await Business.findById(businessId).select({ _id: 1, paidUntil: 1, status: 1 }).session(session).lean();
+      const existing = await Payment.findOne({
+        businessId: validatedBusinessId,
+        $or: [{ mpPaymentId: paymentId }, { attemptReference }],
+      }).session(session).lean();
+      const business = await Business.findById(validatedBusinessId).select({ _id: 1, paidUntil: 1, status: 1 }).session(session).lean();
       if (!business) throw new Error('NO_BUSINESS');
 
       if (existing && !isValidPaymentTransition(existing.status, nextStatus)) {
@@ -80,8 +137,7 @@ export async function reconcileProviderPayment(payment: ProviderPayment, expecte
         return;
       }
 
-      const currentPaidUntil = business.paidUntil && business.paidUntil > now ? business.paidUntil : now;
-      const periodTo = new Date(currentPaidUntil.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const periodTo = calculatePaymentPeriodTo(business.paidUntil, now);
       const preferenceId = typeof payment.preference_id === 'string' && payment.preference_id.trim()
         ? payment.preference_id.trim()
         : existing?.preferenceId;
@@ -119,7 +175,7 @@ export async function reconcileProviderPayment(payment: ProviderPayment, expecte
   } finally {
     await session.endSession();
   }
-  return Payment.findOne({ mpPaymentId: paymentId, businessId }).lean();
+  return Payment.findOne({ mpPaymentId: paymentId, businessId: validatedBusinessId }).lean();
 }
 
 export function toBillingPaymentDTO(payment: {
