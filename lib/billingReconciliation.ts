@@ -25,6 +25,9 @@ export type BillingPaymentDTO = {
   currency: string;
   providerReference: string;
   paidThrough: string;
+  attemptReference?: string;
+  preferenceId?: string;
+  paymentId?: string;
 };
 
 export function isSupportedProviderStatus(status: string | undefined) {
@@ -126,6 +129,7 @@ export function toBillingPaymentDTO(payment: {
   amount: number;
   currency: string;
   mpPaymentId?: string | null;
+  preferenceId?: string | null;
   attemptReference: string;
   periodTo: Date;
 }): BillingPaymentDTO {
@@ -137,5 +141,8 @@ export function toBillingPaymentDTO(payment: {
     currency: payment.currency,
     providerReference: payment.mpPaymentId || payment.attemptReference,
     paidThrough: payment.periodTo.toISOString(),
+    attemptReference: payment.attemptReference,
+    ...(payment.preferenceId ? { preferenceId: payment.preferenceId } : {}),
+    ...(payment.mpPaymentId ? { paymentId: payment.mpPaymentId } : {}),
   };
 }

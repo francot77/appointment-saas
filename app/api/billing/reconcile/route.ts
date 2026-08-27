@@ -19,10 +19,11 @@ function isTransactionUnsupported(error: unknown) {
 export async function POST(req: NextRequest) {
   try {
     const business = await getCurrentBusiness();
-    const body = await req.json().catch(() => ({})) as { paymentId?: unknown; attemptReference?: unknown };
+    const body = await req.json().catch(() => ({})) as { paymentId?: unknown; attemptReference?: unknown; preferenceId?: unknown };
     const paymentId = typeof body.paymentId === 'string' ? body.paymentId.trim() : '';
     const attemptReference = typeof body.attemptReference === 'string' ? body.attemptReference.trim() : '';
-    const reference = paymentId || attemptReference;
+    const preferenceId = typeof body.preferenceId === 'string' ? body.preferenceId.trim() : '';
+    const reference = paymentId || attemptReference || preferenceId;
     if (!reference || reference.length > 150) return apiError('Referencia inválida', 400, 'VALIDATION');
     await dbConnect();
     const local = await Payment.findOne({ businessId: business._id, $or: [{ mpPaymentId: reference }, { preferenceId: reference }, { attemptReference: reference }] }).lean();
