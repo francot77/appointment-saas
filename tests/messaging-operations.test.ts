@@ -26,7 +26,7 @@ describe('messaging production contracts', () => {
       { provider: 1, phoneNumberId: 1 },
       { unique: true },
     ]);
-    expect(MessagingConnection.schema.path('enabled').defaultValue).toBe(false);
+    expect((MessagingConnection.schema.path('enabled') as { defaultValue?: unknown }).defaultValue).toBe(false);
   });
 
   it('preserves the manual appointment contract while automation remains additive', () => {

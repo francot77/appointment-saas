@@ -82,6 +82,8 @@ export default function MessagingSettingsCard({ className = '' }: Props) {
 
   const automaticMessaging = entitlement ? presentAutomaticMessaging(entitlement) : null;
 
+  if (!entitlement || entitlement.plan === 'basic') return null;
+
   return (
     <section className={`rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-sm sm:p-6 ${className}`} aria-labelledby="messaging-settings-title">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

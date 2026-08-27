@@ -1,11 +1,13 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
+import { NextRequest } from 'next/server';
 import {
   buildMetaWebhookEventId,
   processMetaWebhookPayload,
   shouldAdvanceDeliveryStatus,
   verifyMetaSignature,
 } from '@/lib/messaging/webhook';
+import type { MetaDeliveryStatus } from '@/lib/messaging/webhook';
 import { GET, POST } from '@/app/api/webhooks/meta/whatsapp/route';
 
 const rawBody = JSON.stringify({ object: 'whatsapp_business_account' });
@@ -21,7 +23,7 @@ function payload(status: string, id = 'wamid.1') {
   };
 }
 
-function dependencies(options: { existingStatus?: string; replay?: boolean } = {}) {
+function dependencies(options: { existingStatus?: MetaDeliveryStatus; replay?: boolean } = {}) {
   const updates: Array<{ filter: Record<string, unknown>; update: Record<string, unknown> }> = [];
   const events: string[] = [];
   return {
@@ -39,8 +41,8 @@ function dependencies(options: { existingStatus?: string; replay?: boolean } = {
 describe('Meta webhook verification and reconciliation', () => {
   it('serves the official challenge only for the configured verification token', async () => {
     process.env.META_WHATSAPP_VERIFY_TOKEN = 'verify-token';
-    const valid = await GET(new Request('http://localhost/api/webhooks/meta/whatsapp?hub.mode=subscribe&hub.verify_token=verify-token&hub.challenge=challenge-1') as any);
-    const invalid = await GET(new Request('http://localhost/api/webhooks/meta/whatsapp?hub.mode=subscribe&hub.verify_token=wrong&hub.challenge=challenge-1') as any);
+    const valid = await GET(new NextRequest('http://localhost/api/webhooks/meta/whatsapp?hub.mode=subscribe&hub.verify_token=verify-token&hub.challenge=challenge-1'));
+    const invalid = await GET(new NextRequest('http://localhost/api/webhooks/meta/whatsapp?hub.mode=subscribe&hub.verify_token=wrong&hub.challenge=challenge-1'));
     expect(await valid.text()).toBe('challenge-1');
     expect(valid.status).toBe(200);
     expect(invalid.status).toBe(403);
@@ -48,9 +50,9 @@ describe('Meta webhook verification and reconciliation', () => {
 
   it('rejects an invalid POST signature before parsing or touching persistence', async () => {
     process.env.META_WHATSAPP_APP_SECRET = 'app-secret';
-    const response = await POST(new Request('http://localhost/api/webhooks/meta/whatsapp', {
+    const response = await POST(new NextRequest('http://localhost/api/webhooks/meta/whatsapp', {
       method: 'POST', body: rawBody, headers: { 'x-hub-signature-256': 'sha256=wrong' },
-    }) as any);
+    }));
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: 'Invalid signature' });
   });

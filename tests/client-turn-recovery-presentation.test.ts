@@ -40,6 +40,27 @@ describe('client turn recovery presentation contract', () => {
     expect(client).toContain('No se encontró información para este turno.');
   });
 
+  it('owns token and retry loads with abortable request identities', () => {
+    expect(client).toContain('useRef');
+    expect(client).toContain('activeAppointmentRequestRef');
+    expect(client).toContain('activeAppointmentRequestRef.current?.controller.abort()');
+    expect(client).toContain('appointmentRequestIdRef');
+    expect(client).toContain('const isCurrentRequest = () =>');
+    expect(client).toContain('if (!isCurrentRequest()) return;');
+  });
+
+  it('guards stale state, storage, expiry cleanup, and finally effects', () => {
+    expect(client).toMatch(
+      /if \(!isCurrentRequest\(\)\) return;[\s\S]*removeSavedAppointmentByToken\(token\)/,
+    );
+    expect(client).toMatch(
+      /if \(!isCurrentRequest\(\)\) return;[\s\S]*saveAppointment\(\{/,
+    );
+    expect(client).toMatch(
+      /finally \{[\s\S]*window\.clearTimeout\(timeout\);[\s\S]*if \(isCurrentRequest\(\)\) \{[\s\S]*setLoading\(false\)/,
+    );
+  });
+
   it('preserves cancellation, availability, selection, and reschedule behavior', () => {
     expect(client).toContain('window.confirm(');
     expect(client).toContain('body: JSON.stringify({ action: \'cancel\' })');

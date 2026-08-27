@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { MercadoPagoConfig, Payment as MPPayment } from 'mercadopago';
 import dbConnect from '@/lib/db';
 import { getCurrentBusiness } from '@/lib/currentBusiness';
 import { Payment } from '@/lib/models/Payments';
 import { apiError } from '@/lib/apiError';
-import { reconcileProviderPayment, toBillingPaymentDTO } from '@/lib/billingReconciliation';
+import { reconcileProviderPayment, toBillingPaymentDTO, type ProviderPayment } from '@/lib/billingReconciliation';
+import { createMercadoPagoClients, getMercadoPagoAccessToken, getMercadoPagoErrorStatus, MERCADO_PAGO_TIMEOUT_MS } from '@/lib/mercadoPago';
 
 export const runtime = 'nodejs';
 
@@ -19,22 +19,32 @@ function isTransactionUnsupported(error: unknown) {
 export async function POST(req: NextRequest) {
   try {
     const business = await getCurrentBusiness();
-    const body = await req.json().catch(() => ({})) as { paymentId?: unknown };
+    const body = await req.json().catch(() => ({})) as { paymentId?: unknown; attemptReference?: unknown };
     const paymentId = typeof body.paymentId === 'string' ? body.paymentId.trim() : '';
-    if (!paymentId || paymentId.length > 100) return apiError('paymentId inválido', 400, 'VALIDATION');
+    const attemptReference = typeof body.attemptReference === 'string' ? body.attemptReference.trim() : '';
+    const reference = paymentId || attemptReference;
+    if (!reference || reference.length > 150) return apiError('Referencia inválida', 400, 'VALIDATION');
     await dbConnect();
-    const local = await Payment.findOne({ businessId: business._id, mpPaymentId: paymentId }).select({ _id: 1 }).lean();
+    const local = await Payment.findOne({ businessId: business._id, $or: [{ mpPaymentId: reference }, { preferenceId: reference }, { attemptReference: reference }] }).lean();
     if (!local) return apiError('Pago no encontrado', 404, 'NOT_FOUND');
-    const accessToken = process.env.NODE_ENV === 'production' ? process.env.MP_ACCESS_TOKEN_PROD : process.env.MP_ACCESS_TOKEN_TEST;
+    const accessToken = getMercadoPagoAccessToken();
     if (!accessToken) return apiError('Mercado Pago no configurado', 503, 'INTERNAL');
-    const providerPayment = await new MPPayment(new MercadoPagoConfig({ accessToken })).get({ id: paymentId });
-    const reconciled = await reconcileProviderPayment({ ...providerPayment, id: paymentId }, String(business._id));
+    const { payment: providerClient } = createMercadoPagoClients(accessToken);
+    let providerPayment: ProviderPayment | undefined;
+    if (local.mpPaymentId === reference) providerPayment = await providerClient.get({ id: reference, requestOptions: { timeout: MERCADO_PAGO_TIMEOUT_MS } });
+    else {
+      const search = await providerClient.search({ options: { external_reference: local.attemptReference }, requestOptions: { timeout: MERCADO_PAGO_TIMEOUT_MS } });
+      providerPayment = search?.results?.[0];
+    }
+    if (!providerPayment) return apiError('Pago todavía no disponible', 404, 'NOT_FOUND');
+    const reconciled = await reconcileProviderPayment({ ...providerPayment, id: providerPayment.id }, String(business._id));
     if (!reconciled) return apiError('Pago no encontrado', 404, 'NOT_FOUND');
     return NextResponse.json({ payment: toBillingPaymentDTO(reconciled) });
   } catch (error) {
     if (error instanceof Error && error.message === 'UNAUTHORIZED') return apiError('Unauthorized', 401, 'UNAUTHORIZED');
     if (error instanceof Error && error.message === 'NO_BUSINESS') return apiError('No business', 403, 'FORBIDDEN');
     if (error instanceof Error && error.message === 'PAYMENT_INVALID') return apiError('Pago no válido', 422, 'VALIDATION');
+    if (getMercadoPagoErrorStatus(error) === 404) return apiError('Pago todavía no disponible', 404, 'NOT_FOUND');
     if (isTransactionUnsupported(error)) {
       return apiError('Reconciliación requiere MongoDB con soporte para transacciones', 503, 'INTERNAL');
     }

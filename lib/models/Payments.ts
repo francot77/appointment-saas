@@ -16,7 +16,11 @@ const PaymentSchema = new Schema(
       default: 'mp',
     },
 
-    mpPaymentId: { type: String, required: true },
+    mpPaymentId: { type: String, default: null },
+    preferenceId: { type: String, default: null },
+    attemptReference: { type: String, required: true },
+    productVersion: { type: String, required: true, default: 'v1' },
+    periodMonths: { type: Number, required: true, default: 1 },
     status: {
       type: String,
       enum: ['approved', 'pending', 'rejected'],
@@ -33,7 +37,9 @@ const PaymentSchema = new Schema(
   { timestamps: true }
 );
 
-PaymentSchema.index({ mpPaymentId: 1 }, { unique: true });
+PaymentSchema.index({ mpPaymentId: 1 }, { unique: true, sparse: true });
+PaymentSchema.index({ preferenceId: 1 }, { unique: true, sparse: true });
+PaymentSchema.index({ businessId: 1, attemptReference: 1 }, { unique: true });
 
 export const Payment =
   models.Payment || model('Payment', PaymentSchema);

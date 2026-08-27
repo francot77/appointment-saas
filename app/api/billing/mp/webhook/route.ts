@@ -1,14 +1,14 @@
 import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { MercadoPagoConfig, Payment as MPPayment } from 'mercadopago';
 import dbConnect from '@/lib/db';
 import { apiError } from '@/lib/apiError';
 import { reconcileProviderPayment, isSupportedProviderStatus } from '@/lib/billingReconciliation';
 import { logger } from '@/lib/logger';
+import { createMercadoPagoClients, getMercadoPagoAccessToken, MERCADO_PAGO_TIMEOUT_MS } from '@/lib/mercadoPago';
 
 export const runtime = 'nodejs';
 
-function verifySignature(req: NextRequest, dataId: string, secret: string) {
+export function verifySignature(req: NextRequest, dataId: string, secret: string) {
   const signature = req.headers.get('x-signature');
   const requestId = req.headers.get('x-request-id');
   if (!signature || !requestId || !dataId) return false;
@@ -46,19 +46,23 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json().catch(() => null) as { type?: unknown; data?: { id?: unknown } } | null;
+    const rawBody = await req.text();
+    let body: { type?: unknown; data?: { id?: unknown } };
+    try {
+      body = JSON.parse(rawBody) as { type?: unknown; data?: { id?: unknown } };
+    } catch {
+      return apiError('Payload de webhook inválido', 400, 'VALIDATION');
+    }
     const topic = req.nextUrl.searchParams.get('type') || body?.type;
     const paymentId = String(body?.data?.id ?? dataId);
     if (topic !== 'payment' || !paymentId || paymentId !== dataId) return NextResponse.json({ ok: true });
 
     await dbConnect();
-    const accessToken = process.env.NODE_ENV === 'production'
-      ? process.env.MP_ACCESS_TOKEN_PROD
-      : process.env.MP_ACCESS_TOKEN_TEST;
+    const accessToken = getMercadoPagoAccessToken();
     if (!accessToken) return apiError('Mercado Pago no configurado', 500, 'INTERNAL');
 
-    const client = new MercadoPagoConfig({ accessToken });
-    const providerPayment = await new MPPayment(client).get({ id: paymentId });
+    const { payment: paymentClient } = createMercadoPagoClients(accessToken);
+    const providerPayment = await paymentClient.get({ id: paymentId, requestOptions: { timeout: MERCADO_PAGO_TIMEOUT_MS } });
     const payment = providerPayment as typeof providerPayment & {
       external_reference?: string;
       transaction_amount?: number;

@@ -48,3 +48,4 @@ next-env.d.ts
 # local generated artifacts
 /landing-current.png
 /favicon-for-app.zip
+/openspect/

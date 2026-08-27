@@ -112,6 +112,13 @@ describe('SettingsTab messaging and sticky-save presentation contract', () => {
     expect(messagingCard).toContain('var(--color-danger-background)');
   });
 
+  it('fails closed until paid entitlements resolve', () => {
+    expect(messagingCard).toContain("if (!entitlement || entitlement.plan === 'basic') return null;");
+    expect(messagingCard).toContain('const automaticMessaging = entitlement ? presentAutomaticMessaging(entitlement) : null;');
+    expect(messagingCard).toContain('{automaticMessaging && entitlement &&');
+    expect(settingsTab).toContain('<MessagingSettingsCard />');
+  });
+
   it('preserves the no-props parent contract and excludes browser claims', () => {
     expect(dashboardClient).toContain("{tab === 'settings' && <SettingsTab />}");
     expect(settingsTab).not.toContain('window.getComputedStyle');

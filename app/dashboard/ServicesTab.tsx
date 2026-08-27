@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { BrandConfig, DEFAULT_BRAND } from './types';
 import {
   Alert,
@@ -57,7 +57,7 @@ export default function ServicesTab({ brand }: Props) {
   const deleteCancelRef = useRef<HTMLButtonElement>(null);
   const deleteTriggerRef = useRef<HTMLButtonElement>(null);
 
-  function serviceError(action: 'load' | 'save' | 'update' | 'delete') {
+  const serviceError = useCallback((action: 'load' | 'save' | 'update' | 'delete') => {
     return action === 'load'
       ? 'No pudimos cargar tus servicios. Intentá nuevamente.'
       : action === 'save'
@@ -65,10 +65,6 @@ export default function ServicesTab({ brand }: Props) {
         : action === 'update'
           ? 'No pudimos actualizar la visibilidad del servicio. Intentá nuevamente.'
           : 'No pudimos eliminar el servicio. Intentá nuevamente.';
-  }
-
-  useEffect(() => {
-    loadServices();
   }, []);
 
   function resetForm() {
@@ -82,7 +78,7 @@ export default function ServicesTab({ brand }: Props) {
     });
   }
 
-  async function loadServices(): Promise<boolean> {
+  const loadServices = useCallback(async function loadServices(): Promise<boolean> {
     setLoading(true);
     setError(null);
     try {
@@ -112,7 +108,7 @@ export default function ServicesTab({ brand }: Props) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [serviceError]);
 
   function startEdit(service: Service) {
     setEditing(service);
@@ -187,6 +183,10 @@ export default function ServicesTab({ brand }: Props) {
     deleteTriggerRef.current = trigger;
     setDeleteTarget(service);
   }
+
+  useEffect(() => {
+    void loadServices();
+  }, [loadServices]);
 
   useEffect(() => {
     if (!deleteTarget) {

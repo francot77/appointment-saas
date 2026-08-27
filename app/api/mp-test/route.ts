@@ -1,9 +1,8 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server';
-import { MercadoPagoConfig, Preference } from 'mercadopago';
 import { auth } from '@/lib/auth';
 import { apiError } from '@/lib/apiError';
 import { getBasicPriceARS, getPublicAppUrl } from '@/lib/billingConfig';
+import { createMercadoPagoClients, MERCADO_PAGO_TIMEOUT_MS } from '@/lib/mercadoPago';
 
 export const runtime = 'nodejs';
 
@@ -36,8 +35,7 @@ export async function POST() {
       );
     }
 
-    const client = new MercadoPagoConfig({ accessToken });
-    const preference = new Preference(client);
+    const { preference } = createMercadoPagoClients(accessToken);
 
     const pref = await preference.create({
       body: {
@@ -59,15 +57,16 @@ export async function POST() {
         auto_return: 'approved',
         // 🔴 IMPORTANTE: por ahora SIN notification_url
       },
+      requestOptions: { timeout: MERCADO_PAGO_TIMEOUT_MS },
     });
 
     console.log('[MP TEST] preference created', {
-      hasInitPoint: Boolean((pref as any).sandbox_init_point || (pref as any).init_point),
+      hasInitPoint: Boolean(pref.sandbox_init_point || pref.init_point),
     });
 
     const initPoint =
-      (pref as any).sandbox_init_point ??
-      (pref as any).init_point ??
+      pref.sandbox_init_point ??
+      pref.init_point ??
       null;
 
     return NextResponse.json(
@@ -77,7 +76,7 @@ export async function POST() {
       },
       { status: 200 }
     );
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[MP TEST] failed', {
       error: err instanceof Error ? err.name : 'unknown',
     });

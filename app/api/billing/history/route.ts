@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     }
     const [payments, total] = await Promise.all([
       Payment.find({ businessId: business._id }).sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit)
-        .select({ _id: 1, status: 1, createdAt: 1, amount: 1, currency: 1, mpPaymentId: 1, periodTo: 1 }).lean(),
+        .select({ _id: 1, status: 1, createdAt: 1, amount: 1, currency: 1, mpPaymentId: 1, attemptReference: 1, periodTo: 1 }).lean(),
       Payment.countDocuments({ businessId: business._id }),
     ]);
     return NextResponse.json({ payments: payments.map(toBillingPaymentDTO), page, limit, total, hasMore: page * limit < total });

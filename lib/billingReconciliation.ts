@@ -7,6 +7,7 @@ import { getAcceptedBasicPricesARS } from '@/lib/billingConfig';
 export type ProviderPayment = {
   id?: string | number;
   external_reference?: string;
+  preference_id?: string;
   transaction_amount?: number;
   currency_id?: string;
   status?: string;
@@ -35,7 +36,8 @@ function normalizeStatus(status: string) {
 }
 
 export function validateProviderPayment(payment: ProviderPayment, expectedBusinessId?: string) {
-  const businessId = payment.external_reference;
+  const reference = payment.external_reference || '';
+  const businessId = reference.split(':', 1)[0];
   const item = payment.additional_info?.items?.find((candidate) => candidate.id === BASIC_PRODUCT_ID);
   const acceptedPricesARS = getAcceptedBasicPricesARS();
   if (!isSupportedProviderStatus(payment.status) || !businessId || !Types.ObjectId.isValid(businessId) ||
@@ -44,11 +46,17 @@ export function validateProviderPayment(payment: ProviderPayment, expectedBusine
       !acceptedPricesARS.includes(item.unit_price as number) || item.quantity !== 1) {
     throw new Error('PAYMENT_INVALID');
   }
-  return { businessId, nextStatus: normalizeStatus(payment.status as string) };
+  return { businessId, attemptReference: reference, nextStatus: normalizeStatus(payment.status as string) };
+}
+
+export function isValidPaymentTransition(current: string | undefined, incoming: string) {
+  if (!current) return true;
+  if (current === 'approved' || current === 'rejected') return false;
+  return incoming === 'approved' || incoming === 'pending' || incoming === 'rejected';
 }
 
 export async function reconcileProviderPayment(payment: ProviderPayment, expectedBusinessId?: string) {
-  const { businessId, nextStatus } = validateProviderPayment(payment, expectedBusinessId);
+  const { businessId, attemptReference, nextStatus } = validateProviderPayment(payment, expectedBusinessId);
   const paymentId = String(payment.id || '');
   if (!paymentId) throw new Error('PAYMENT_INVALID');
 
@@ -57,15 +65,15 @@ export async function reconcileProviderPayment(payment: ProviderPayment, expecte
   const now = new Date();
   try {
     const applyPayment = () => session.withTransaction(async () => {
-      const existing = await Payment.findOne({ mpPaymentId: paymentId }).session(session).lean();
+      const existing = await Payment.findOne({ $or: [{ mpPaymentId: paymentId }, { attemptReference }] }).session(session).lean();
       const business = await Business.findById(businessId).select({ _id: 1, paidUntil: 1, status: 1 }).session(session).lean();
       if (!business) throw new Error('NO_BUSINESS');
 
-      if (existing?.status === 'approved') {
+      if (existing && !isValidPaymentTransition(existing.status, nextStatus)) {
+        if (existing.status === 'rejected') return;
         await Business.updateOne({ _id: business._id }, { $max: { paidUntil: existing.periodTo }, $set: { status: 'active' } }, { session });
         return;
       }
-      if (existing?.status === 'rejected') return;
 
       const currentPaidUntil = business.paidUntil && business.paidUntil > now ? business.paidUntil : now;
       const periodTo = new Date(currentPaidUntil.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -74,6 +82,10 @@ export async function reconcileProviderPayment(payment: ProviderPayment, expecte
         currency: payment.currency_id,
         method: 'mp',
         mpPaymentId: paymentId,
+        preferenceId: payment.preference_id || existing?.preferenceId || null,
+        attemptReference,
+        productVersion: 'v1',
+        periodMonths: 1,
         productId: BASIC_PRODUCT_ID,
         providerStatus: payment.status || 'unknown',
         status: nextStatus,
@@ -108,7 +120,8 @@ export function toBillingPaymentDTO(payment: {
   createdAt: Date;
   amount: number;
   currency: string;
-  mpPaymentId: string;
+  mpPaymentId: string | null;
+  attemptReference: string;
   periodTo: Date;
 }): BillingPaymentDTO {
   return {
@@ -117,7 +130,7 @@ export function toBillingPaymentDTO(payment: {
     createdAt: payment.createdAt.toISOString(),
     amount: payment.amount,
     currency: payment.currency,
-    providerReference: payment.mpPaymentId,
+    providerReference: payment.mpPaymentId || payment.attemptReference,
     paidThrough: payment.periodTo.toISOString(),
   };
 }

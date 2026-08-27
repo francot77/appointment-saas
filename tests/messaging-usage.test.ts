@@ -2,9 +2,28 @@ import { describe, expect, it } from 'vitest';
 import { AutomaticUsage } from '@/lib/models/AutomaticUsage';
 import { commit, markUncertain, reconcileUncertainAsOperator, release, reserve } from '@/lib/messaging/usage';
 
-type Usage = any;
+type AllocationState = 'reserved' | 'uncertain' | 'accepted' | 'released';
+type Allocation = { jobKey: string; jobId: string; state: AllocationState; [key: string]: unknown };
+type UsageDocument = { businessId: string; periodKey: string; acceptedCount: number; allocations: Allocation[] };
+type UsageFilter = {
+  businessId?: string;
+  periodKey?: string;
+  'allocations.jobKey'?: { $ne?: string } | string;
+  allocations?: { $elemMatch?: { jobKey: string; state: { $in: AllocationState[] } } };
+  $expr?: { $lt: [unknown, number] };
+};
+type UsageUpdate = {
+  $setOnInsert?: UsageDocument;
+  $push?: { allocations: Allocation };
+  $pull?: { allocations: { jobKey: string; state: AllocationState | { $in: AllocationState[] } } };
+  $inc?: { acceptedCount: number };
+  $set?: Record<string, unknown>;
+};
+function isAllocationState(value: unknown): value is AllocationState {
+  return value === 'reserved' || value === 'uncertain' || value === 'accepted' || value === 'released';
+}
 
-function memoryModel(initial: Usage[] = []) {
+function memoryModel(initial: UsageDocument[] = []) {
   const documents = initial;
   let locked = false;
   async function atomic<T>(operation: () => T) {
@@ -12,38 +31,42 @@ function memoryModel(initial: Usage[] = []) {
     locked = true;
     try { return operation(); } finally { locked = false; }
   }
-  const find = (filter: Usage) => documents.find((doc) => doc.businessId === filter.businessId && doc.periodKey === filter.periodKey);
+  const find = (filter: UsageFilter) => documents.find((doc) => doc.businessId === filter.businessId && doc.periodKey === filter.periodKey);
   return {
     documents,
-    async updateOne(filter: Usage, update: Usage) {
+    async updateOne(filter: UsageFilter, update: UsageUpdate) {
       if (!find(filter) && update.$setOnInsert) documents.push({ ...update.$setOnInsert });
     },
-    async findOne(filter: Usage) {
+    async findOne(filter: UsageFilter) {
       const doc = find(filter);
-      return doc && (!filter['allocations.jobKey'] || doc.allocations.some((a: Usage) => a.jobKey === filter['allocations.jobKey'])) ? doc : null;
+      const jobKey = filter['allocations.jobKey'];
+      return doc && (!jobKey || (typeof jobKey === 'string' && doc.allocations.some((a) => a.jobKey === jobKey))) ? doc : null;
     },
-    async findOneAndUpdate(filter: Usage, update: Usage, options: Usage = {}) {
+    async findOneAndUpdate(filter: UsageFilter, update: UsageUpdate, options: { arrayFilters?: unknown[] } = {}) {
       return atomic(() => {
         if (options.arrayFilters && !Object.values(update).some((value) => JSON.stringify(value).includes('$[allocation]'))) {
           throw new Error('unused array filter identifier: allocation');
         }
         const doc = find(filter);
-        const active = doc?.allocations.filter((a: Usage) => ['reserved', 'uncertain'].includes(a.state)).length ?? 0;
+        const active = doc?.allocations.filter((a) => ['reserved', 'uncertain'].includes(a.state)).length ?? 0;
         if (!doc || (filter.$expr && doc.acceptedCount + active >= filter.$expr.$lt[1])) return null;
-        if (filter['allocations.jobKey']?.$ne && doc.allocations.some((a: Usage) => a.jobKey === filter['allocations.jobKey'].$ne)) return null;
+        const jobKeyFilter = filter['allocations.jobKey'];
+        if (typeof jobKeyFilter === 'object' && jobKeyFilter.$ne && doc.allocations.some((a) => a.jobKey === jobKeyFilter.$ne)) return null;
         if (filter.allocations?.$elemMatch) {
-          const allocation = doc.allocations.find((a: Usage) => a.jobKey === filter.allocations.$elemMatch.jobKey && filter.allocations.$elemMatch.state.$in.includes(a.state));
+          const allocation = doc.allocations.find((a) => a.jobKey === filter.allocations?.$elemMatch?.jobKey && filter.allocations?.$elemMatch?.state.$in.includes(a.state));
           if (!allocation) return null;
           if (update.$pull) {
-            const states = update.$pull.allocations.state.$in ?? [update.$pull.allocations.state];
-            doc.allocations = doc.allocations.filter((a: Usage) => !(a.jobKey === update.$pull.allocations.jobKey && states.includes(a.state)));
+            const pull = update.$pull.allocations;
+            const states = typeof pull.state === 'object' ? pull.state.$in : [pull.state];
+            doc.allocations = doc.allocations.filter((a) => !(a.jobKey === pull.jobKey && states.includes(a.state)));
           }
           if (update.$inc) doc.acceptedCount += update.$inc.acceptedCount;
           if (update.$set) {
             allocation.state = Object.values(update.$set)[0] === 'accepted' ? 'accepted' : Object.values(update.$set)[0] === 'uncertain' ? 'uncertain' : allocation.state;
             allocation.providerMessageId = Object.values(update.$set).find((v) => typeof v === 'string' && v !== 'accepted' && v !== 'uncertain') ?? allocation.providerMessageId;
-            const set = update.$set as Usage;
-            allocation.state = set['allocations.$[allocation].state'] ?? allocation.state;
+            const set = update.$set;
+            const nextState = set['allocations.$[allocation].state'];
+            if (isAllocationState(nextState)) allocation.state = nextState;
             allocation.reconcilerId = set['allocations.$[allocation].reconcilerId'] ?? allocation.reconcilerId;
             allocation.reconciliationReason = set['allocations.$[allocation].reconciliationReason'] ?? allocation.reconciliationReason;
             allocation.reconciliationEvidenceRef = set['allocations.$[allocation].reconciliationEvidenceRef'] ?? allocation.reconciliationEvidenceRef;
@@ -52,7 +75,8 @@ function memoryModel(initial: Usage[] = []) {
           }
           return doc;
         }
-        const allocation = update.$push.allocations as Usage;
+        const allocation = update.$push?.allocations;
+        if (!allocation) throw new Error('missing allocation');
         doc.allocations.push(allocation);
         return doc;
       });

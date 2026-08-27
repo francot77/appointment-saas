@@ -1,11 +1,12 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // app/api/billing/mp/checkout/route.ts
 import { NextResponse } from 'next/server';
-import { MercadoPagoConfig, Preference } from 'mercadopago';
 import dbConnect from '@/lib/db';
 import { getCurrentBusiness } from '@/lib/currentBusiness';
 import { BASIC_PRODUCT_ID } from '@/lib/billingEntitlements';
 import { getBasicPriceARS, getPublicAppUrl } from '@/lib/billingConfig';
+import { Payment } from '@/lib/models/Payments';
+import { buildBasicPreferenceBody, createMercadoPagoClients, getMercadoPagoAccessToken, MERCADO_PAGO_TIMEOUT_MS } from '@/lib/mercadoPago';
+import crypto from 'node:crypto';
 
 export const runtime = 'nodejs';
 
@@ -14,17 +15,20 @@ export async function POST() {
     const basicPriceARS = getBasicPriceARS();
     const appUrl = getPublicAppUrl();
     await dbConnect();
-    const business: any = await getCurrentBusiness();
+    const business = await getCurrentBusiness();
 
     if (!business) {
       return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
     }
 
+    const attemptReference = `${business._id.toString()}:${crypto.randomUUID()}`;
+    const periodFrom = new Date();
+    const periodTo = new Date(periodFrom.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const attempt = await Payment.create({ businessId: business._id, amount: basicPriceARS, currency: 'ARS', method: 'mp', attemptReference, productVersion: 'v1', periodMonths: 1, status: 'pending', periodFrom, periodTo, productId: BASIC_PRODUCT_ID, providerStatus: 'created' });
+
     // Determinar si estamos en producción o test
     const isProduction = process.env.NODE_ENV === 'production';
-    const accessToken = isProduction
-      ? process.env.MP_ACCESS_TOKEN_PROD
-      : process.env.MP_ACCESS_TOKEN_TEST;
+    const accessToken = getMercadoPagoAccessToken();
 
     if (!accessToken) {
       console.error(
@@ -37,15 +41,7 @@ export async function POST() {
       );
     }
 
-    const client = new MercadoPagoConfig({ accessToken });
-    const preference = new Preference(client);
-
-    // URLs de retorno correctas
-    const backUrls = {
-      success: `${appUrl}/billing?status=success`,
-      failure: `${appUrl}/billing?status=failure`,
-      pending: `${appUrl}/billing?status=pending`,
-    };
+    const { preference } = createMercadoPagoClients(accessToken);
 
     console.log('[MP CHECKOUT] Creating preference', {
       businessId: business._id.toString(),
@@ -56,30 +52,11 @@ export async function POST() {
 
     // Crear la preferencia con todos los datos necesarios
     const pref = await preference.create({
-      body: {
-        items: [
-          {
-            id: BASIC_PRODUCT_ID,
-            title: 'Suscripción mensual turnos',
-            description: 'Plan básico - 1 mes',
-            unit_price: basicPriceARS,
-            currency_id: 'ARS',
-            quantity: 1,
-          },
-        ],
-        external_reference: business._id.toString(),
-        metadata: { product_id: BASIC_PRODUCT_ID, plan: 'basic' },
-        back_urls: backUrls,
-        auto_return: 'approved',
-        notification_url: `${appUrl}/api/billing/mp/webhook`,
-        payer: {
-          name: business.name || 'Cliente',
-          email: business.ownerUserId?.email || undefined,
-        },
-      },
+      body: buildBasicPreferenceBody({ appUrl, attemptReference, priceARS: basicPriceARS, name: business.name, email: business.ownerUserId?.email }),
+      requestOptions: { timeout: MERCADO_PAGO_TIMEOUT_MS, idempotencyKey: `preference-${attemptReference}` },
     });
 
-    const initPoint = (pref as any).init_point ?? null;
+    const initPoint = pref.init_point ?? null;
 
     if (!initPoint) {
       console.error('[MP CHECKOUT] No init_point received', {
@@ -91,8 +68,10 @@ export async function POST() {
       );
     }
 
+    await Payment.updateOne({ _id: attempt._id, businessId: business._id }, { $set: { preferenceId: String(pref.id) } });
+
     console.log('[MP CHECKOUT] Preference created successfully', {
-      preferenceId: (pref as any).id,
+      preferenceId: pref.id,
       hasInitPoint: true,
     });
 
@@ -101,6 +80,7 @@ export async function POST() {
     if (err instanceof Error && ['BILLING_PRICE_NOT_CONFIGURED', 'PUBLIC_APP_URL_NOT_CONFIGURED', 'PUBLIC_APP_URL_INVALID'].includes(err.message)) {
       return NextResponse.json({ error: 'BILLING_CONFIGURATION_ERROR' }, { status: 500 });
     }
+
     console.error('[MP CHECKOUT] failed', {
       error: err instanceof Error ? err.name : 'unknown',
     });

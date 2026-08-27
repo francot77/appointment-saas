@@ -18,6 +18,7 @@ type ActivationState = {
   checklist: { serviceConfigured: boolean; workingHoursConfigured: boolean; profileConfigured: boolean; publicLinkAvailable: boolean };
   slug: string | null;
 };
+type ActivationVisitState = 'unresolved' | 'incomplete' | 'completion' | 'suppressed';
 
 const NAV_ITEMS: { key: TabKey; label: string; icon: IconName }[] = [
   { key: 'appointments', label: 'Turnos', icon: 'calendar' },
@@ -50,9 +51,11 @@ export default function DashboardClient({ businessName, businessSlug, avatarUrl,
   const [tab, setTab] = useState<TabKey>('appointments');
   const [activation, setActivation] = useState<ActivationState | null>(null);
   const [activationError, setActivationError] = useState<string | null>(null);
+  const [activationVisitState, setActivationVisitState] = useState<ActivationVisitState>('unresolved');
   const [copied, setCopied] = useState(false);
   const activationRequestRef = useRef(0);
   const activationControllerRef = useRef<AbortController | null>(null);
+  const activationVisitStateRef = useRef<ActivationVisitState>('unresolved');
   const theme = brand ?? DEFAULT_BRAND;
   const initial = businessName?.trim().charAt(0).toUpperCase() || 'B';
   const currentPage = NAV_ITEMS.find((item) => item.key === tab) ?? NAV_ITEMS[0];
@@ -68,11 +71,16 @@ export default function DashboardClient({ businessName, businessSlug, avatarUrl,
       if (!res.ok) throw new Error(data.error || 'No se pudo cargar la activación');
       if (requestId !== activationRequestRef.current) return;
       setActivation(data);
+      const complete = data.checklist.serviceConfigured && data.checklist.workingHoursConfigured && data.checklist.profileConfigured && data.checklist.publicLinkAvailable;
+      const current = activationVisitStateRef.current;
+      const next = complete ? (current === 'incomplete' ? 'completion' : current === 'completion' || current === 'suppressed' ? current : 'suppressed') : 'incomplete';
+      activationVisitStateRef.current = next;
+      setActivationVisitState(next);
       setActivationError(null);
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') return;
       if (requestId !== activationRequestRef.current) return;
-      setActivationError('No se pudo cargar el checklist de activación.');
+      setActivationError('No pudimos revisar los pasos para activar tu página.');
     } finally {
       if (requestId === activationRequestRef.current) activationControllerRef.current = null;
     }
@@ -113,7 +121,7 @@ export default function DashboardClient({ businessName, businessSlug, avatarUrl,
   function goTo(nextTab: TabKey) { setTab(nextTab); loadActivation(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
 
   return (
-    <main className="min-h-screen text-slate-900" style={{ backgroundColor: theme.background || '#f4f1ec' }}>
+    <main className="min-h-screen bg-[#f4f1ec] text-slate-900">
       <div className="mx-auto flex min-h-screen w-full max-w-[1500px]">
         <aside className="hidden w-64 shrink-0 flex-col border-r border-slate-200/80 bg-[#faf9f6] px-5 py-6 lg:flex">
           <BrandMark avatarUrl={avatarUrl} businessName={businessName} initial={initial} theme={theme} />
@@ -142,11 +150,13 @@ export default function DashboardClient({ businessName, businessSlug, avatarUrl,
               </div>
             </div>
           </header>
-          <div className="mx-auto max-w-6xl px-4 py-5 sm:px-8 lg:px-12 lg:py-8">
-            <ActivationChecklist activation={activation} error={activationError} publicUrl={publicUrl} copied={copied} onCopy={copyPublicUrl} onShare={sharePublicUrl} onNavigate={goTo} theme={theme} />
-            <section aria-label={currentPage.label}>
-              {tab === 'appointments' && <AppointmentsTab brand={theme} />}
-              {tab === 'services' && <ServicesTab brand={theme} />}
+           <div className="mx-auto max-w-6xl px-4 py-5 sm:px-8 lg:px-12 lg:py-8">
+             <section aria-label={currentPage.label}>
+               {tab === 'appointments' && <AppointmentsTab brand={theme} />}
+               {activationVisitState === 'unresolved' && <p className="mb-6 text-xs text-slate-500" role="status">Revisando los pasos para activar tu página...</p>}
+                {activationVisitState === 'incomplete' || activationVisitState === 'completion' ? <ActivationChecklist activation={activation} error={activationError} onNavigate={goTo} onAcknowledge={() => { activationVisitStateRef.current = 'suppressed'; setActivationVisitState('suppressed'); }} theme={theme} /> : activationError && <p className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800" role="status">{activationError}</p>}
+               <PublicLinkUtility activation={activation} publicUrl={publicUrl} copied={copied} onCopy={copyPublicUrl} onShare={sharePublicUrl} theme={theme} />
+               {tab === 'services' && <ServicesTab brand={theme} />}
               {tab === 'schedule' && <ScheduleTab brand={theme} />}
               {tab === 'calendar' && <CalendarTab brand={theme} />}
               {tab === 'settings' && <SettingsTab />}
@@ -169,11 +179,16 @@ function NavItem({ item, active, onClick, theme, mobile = false }: { item: typeo
   return <button type="button" onClick={onClick} aria-current={active ? 'page' : undefined} aria-label={item.label} className={`group relative flex items-center rounded-xl transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${mobile ? 'h-14 w-16 flex-col justify-center gap-1 text-[10px]' : 'w-full gap-3 px-3 py-3 text-left text-sm'} ${active ? 'font-semibold text-slate-950' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'}`} style={active ? { backgroundColor: `${theme.primary}12` } : undefined}><span style={active ? { color: theme.primary } : undefined}><Icon name={item.icon} size={mobile ? 19 : 18} /></span><span>{item.label}</span>{active && <span className={mobile ? 'absolute bottom-0 h-0.5 w-8 rounded-full' : 'absolute left-0 h-7 w-0.5 rounded-full'} style={{ backgroundColor: theme.primary }} />}</button>;
 }
 
-function ActivationChecklist({ activation, error, publicUrl, copied, onCopy, onShare, onNavigate, theme }: { activation: ActivationState | null; error: string | null; publicUrl: string; copied: boolean; onCopy: () => void; onShare: () => void; onNavigate: (tab: TabKey) => void; theme: BrandConfig }) {
+function ActivationChecklist({ activation, error, onNavigate, onAcknowledge, theme }: { activation: ActivationState | null; error: string | null; onNavigate: (tab: TabKey) => void; onAcknowledge: () => void; theme: BrandConfig }) {
   if (error) return <p className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800" role="status">{error}</p>;
-  if (!activation) return <p className="mb-6 text-xs text-slate-500" role="status">Revisando la configuración inicial...</p>;
+  if (!activation) return <p className="mb-6 text-xs text-slate-500" role="status">Revisando los pasos para activar tu página...</p>;
   const items = [{ key: 'serviceConfigured', label: 'Crear tu primer servicio', tab: 'services' as const }, { key: 'workingHoursConfigured', label: 'Definir tus horarios', tab: 'schedule' as const }, { key: 'profileConfigured', label: 'Completar el perfil público', tab: 'settings' as const }] as const;
   const completed = items.filter((item) => activation.checklist[item.key]).length;
   const complete = completed === items.length && activation.checklist.publicLinkAvailable;
-  return <section className="mb-8 overflow-hidden rounded-2xl border border-indigo-200 bg-white shadow-[0_12px_35px_rgba(79,70,229,0.08)]"><div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6"><div><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-indigo-700"><span className="h-2 w-2 rounded-full bg-indigo-600" />{complete ? 'Todo listo' : 'Siguiente paso'}</div><p className="mt-2 text-lg font-semibold tracking-[-0.02em] text-slate-950">{complete ? 'Tu página está lista para compartir' : 'Terminá de activar tu página de turnos'}</p><p className="mt-1 text-sm text-slate-500">{completed} de 3 pasos principales completados.</p></div><div className="min-w-32 text-right"><p className="text-2xl font-semibold text-slate-950">{Math.round((completed / 3) * 100)}%</p><p className="text-xs text-slate-500">configuración</p></div></div><div className="h-1 bg-slate-100"><div className="h-full transition-all" style={{ width: `${(completed / 3) * 100}%`, backgroundColor: theme.primary }} /></div><div className="grid gap-2 p-4 sm:grid-cols-3 sm:p-5">{items.map((item) => { const done = activation.checklist[item.key]; return <button key={item.key} type="button" onClick={() => !done && onNavigate(item.tab)} disabled={done} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-left text-xs transition hover:border-indigo-200 hover:bg-indigo-50 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"><span className={done ? 'text-emerald-600' : 'text-slate-400'}><Icon name={done ? 'check' : 'arrow'} size={15} /></span><span className={done ? 'text-slate-500 line-through' : 'font-semibold text-slate-800'}>{item.label}</span></button>; })}</div>{activation.checklist.publicLinkAvailable && <div className="border-t border-slate-100 px-5 py-4 sm:px-6"><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div className="min-w-0 flex-1"><p className="text-xs font-semibold text-slate-700">Tu enlace público</p><a href={publicUrl} target="_blank" rel="noreferrer" className="mt-1 flex items-center gap-1 break-all text-xs text-indigo-700 underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">{publicUrl}<Icon name="external" size={13} /></a></div><div className="flex gap-2"><button type="button" onClick={onCopy} className="rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-indigo-300 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">{copied ? 'Copiado' : 'Copiar enlace'}</button><button type="button" onClick={onShare} className="rounded-full px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500" style={{ backgroundColor: theme.primary }}>Compartir</button></div></div></div>}</section>;
+  return <section className="mb-8 overflow-hidden rounded-2xl border border-indigo-200 bg-white shadow-[0_12px_35px_rgba(79,70,229,0.08)]"><div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6"><div><div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-indigo-700"><span className="h-2 w-2 rounded-full bg-indigo-600" />{complete ? 'Todo listo' : 'Siguiente paso'}</div><p className="mt-2 text-lg font-semibold tracking-[-0.02em] text-slate-950">{complete ? 'Tu página está lista para compartir' : 'Terminá de activar tu página de turnos'}</p><p className="mt-1 text-sm text-slate-500">{completed} de 3 pasos completados.</p></div><div className="min-w-32 text-right"><p className="text-2xl font-semibold text-slate-950">{Math.round((completed / 3) * 100)}%</p><p className="text-xs text-slate-500">completado</p></div></div><div className="h-1 bg-slate-100"><div className="h-full transition-all" style={{ width: `${(completed / 3) * 100}%`, backgroundColor: theme.primary }} /></div><div className="grid gap-2 p-4 sm:grid-cols-3 sm:p-5">{items.map((item) => { const done = activation.checklist[item.key]; return <button key={item.key} type="button" onClick={() => !done && onNavigate(item.tab)} disabled={done} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-left text-xs transition hover:border-indigo-200 hover:bg-indigo-50 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"><span className={done ? 'text-emerald-600' : 'text-slate-400'}><Icon name={done ? 'check' : 'arrow'} size={15} /></span><span className={done ? 'text-slate-500 line-through' : 'font-semibold text-slate-800'}>{item.label}</span></button>; })}</div>{complete && <button type="button" onClick={onAcknowledge} className="m-4 rounded-full border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">Ocultar checklist</button>}</section>;
+}
+
+function PublicLinkUtility({ activation, publicUrl, copied, onCopy, onShare, theme }: { activation: ActivationState | null; publicUrl: string; copied: boolean; onCopy: () => void; onShare: () => void; theme: BrandConfig }) {
+  if (!activation?.checklist.publicLinkAvailable) return null;
+  return <section className="mb-8 rounded-2xl border border-slate-200 bg-white px-5 py-4 sm:px-6"><div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div className="min-w-0 flex-1"><p className="text-xs font-semibold text-slate-700">Tu enlace público</p><a href={publicUrl} target="_blank" rel="noreferrer" className="mt-1 flex items-center gap-1 break-all text-xs text-indigo-700 underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">{publicUrl}<Icon name="external" size={13} /></a></div><div className="flex gap-2"><button type="button" onClick={onCopy} className="rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">{copied ? 'Copiado' : 'Copiar enlace'}</button><button type="button" onClick={onShare} className="rounded-full px-3 py-2 text-xs font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500" style={{ backgroundColor: theme.primary }}>Compartir</button></div></div></section>;
 }

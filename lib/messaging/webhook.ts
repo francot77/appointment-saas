@@ -6,11 +6,17 @@ export type MetaDeliveryStatus = keyof typeof STATUS_ORDER;
 type MetaStatus = { id?: unknown; status?: unknown; timestamp?: unknown; recipient_id?: unknown; errors?: unknown };
 type MetaChange = { value?: { metadata?: { phone_number_id?: unknown }; statuses?: MetaStatus[] } };
 type MetaPayload = { object?: unknown; entry?: Array<{ changes?: MetaChange[] }> };
+type MessagingConnectionRecord = { businessId?: unknown };
+type WebhookEventRecord = {
+  lastErrorObject?: { updatedExisting?: boolean };
+  value?: { lastErrorObject?: { updatedExisting?: boolean } };
+};
+type MessageJobRecord = { _id: unknown; deliveryStatus?: MetaDeliveryStatus | null };
 
 export type WebhookDependencies = {
-  connectionModel: { findOne: (filter: Record<string, unknown>) => Promise<any> };
-  eventModel: { findOneAndUpdate: (filter: Record<string, unknown>, update: Record<string, unknown>, options: Record<string, unknown>) => Promise<any> };
-  jobModel: { findOne: (filter: Record<string, unknown>) => Promise<any>; updateOne: (filter: Record<string, unknown>, update: Record<string, unknown>) => Promise<any> };
+  connectionModel: { findOne: (filter: Record<string, unknown>) => Promise<MessagingConnectionRecord | null> };
+  eventModel: { findOneAndUpdate: (filter: Record<string, unknown>, update: Record<string, unknown>, options: Record<string, unknown>) => Promise<WebhookEventRecord | null> };
+  jobModel: { findOne: (filter: Record<string, unknown>) => Promise<MessageJobRecord | null>; updateOne: (filter: Record<string, unknown>, update: Record<string, unknown>) => Promise<unknown> };
   now?: Date;
 };
 
