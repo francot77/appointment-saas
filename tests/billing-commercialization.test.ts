@@ -97,13 +97,37 @@ describe('billing commercialization integrity', () => {
   });
 
   it('accepts an approved payment when optional provider items are absent', () => {
-    expect(validateProviderPayment({ ...validPayment, additional_info: undefined }, businessId, {
+    const localAttempt = {
       businessId,
       amount: 10000,
       currency: 'ARS',
       attemptReference: `${businessId}:attempt-1`,
       productId: 'basic-monthly',
-    }).nextStatus).toBe('approved');
+    };
+    for (const additional_info of [undefined, { items: [] }, { items: [{ title: 'Plan básico', quantity: 1 }] }, { items: [{ title: 'Plan básico', unit_price: 10000 }] }]) {
+      expect(validateProviderPayment({ ...validPayment, additional_info }, businessId, localAttempt).nextStatus).toBe('approved');
+    }
+  });
+
+  it('rejects explicit conflicting optional provider item evidence with typed reasons', () => {
+    const localAttempt = {
+      businessId,
+      amount: 10000,
+      currency: 'ARS',
+      attemptReference: `${businessId}:attempt-1`,
+      productId: 'basic-monthly',
+    };
+    const reason = (items: unknown[]) => {
+      try {
+        validateProviderPayment({ ...validPayment, additional_info: { items } }, businessId, localAttempt);
+        return null;
+      } catch (error) {
+        return error instanceof PaymentValidationError ? error.reasonCode : null;
+      }
+    };
+    expect(reason([{ id: 'premium-monthly', unit_price: 10000, quantity: 1 }])).toBe('OPTIONAL_ITEM_MISMATCH');
+    expect(reason([{ id: 'basic-monthly', unit_price: 9999, quantity: 1 }])).toBe('OPTIONAL_ITEM_MISMATCH');
+    expect(reason([{ id: 'basic-monthly', unit_price: 10000, quantity: 2 }])).toBe('OPTIONAL_ITEM_MISMATCH');
   });
 
   it('uses the tenant-scoped local attempt as the product and amount authority', () => {

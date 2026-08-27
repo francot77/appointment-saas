@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import { apiError } from '@/lib/apiError';
-import { getPaymentValidationDiagnostics, PaymentValidationError, reconcileProviderPayment, isSupportedProviderStatus } from '@/lib/billingReconciliation';
+import { getPaymentValidationDiagnostics, PaymentValidationError, reconcileProviderPayment, isSupportedProviderStatus, type ProviderPayment } from '@/lib/billingReconciliation';
 import { logger } from '@/lib/logger';
 import { createMercadoPagoClients, getMercadoPagoAccessToken, MERCADO_PAGO_TIMEOUT_MS } from '@/lib/mercadoPago';
 
@@ -63,14 +63,7 @@ export async function POST(req: NextRequest) {
 
     const { payment: paymentClient } = createMercadoPagoClients(accessToken);
     const providerPayment = await paymentClient.get({ id: paymentId, requestOptions: { timeout: MERCADO_PAGO_TIMEOUT_MS } });
-    const payment = providerPayment as typeof providerPayment & {
-      external_reference?: string;
-      transaction_amount?: number;
-      currency_id?: string;
-      status?: string;
-      status_detail?: string;
-      additional_info?: { items?: Array<{ id?: string; unit_price?: number; quantity?: number }> };
-    };
+    const payment = providerPayment as ProviderPayment;
     if (!isSupportedProviderStatus(payment.status)) {
       logger.error('billing.webhook.invalid', getPaymentValidationDiagnostics(payment, 'UNSUPPORTED_STATUS', false));
       return apiError('Estado de pago no válido', 422, 'VALIDATION');

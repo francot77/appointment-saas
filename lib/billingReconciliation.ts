@@ -13,7 +13,7 @@ export type ProviderPayment = {
   status?: string;
   status_detail?: string;
   additional_info?: {
-    items?: Array<{ id?: string; unit_price?: number; quantity?: number }>;
+    items?: unknown[];
   };
 };
 
@@ -123,6 +123,26 @@ export function calculatePaymentPeriodTo(paidUntil: Date | undefined, now: Date,
   return new Date(currentPaidUntil.getTime() + periodMonths * 30 * 24 * 60 * 60 * 1000);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function hasConflictingOptionalItemEvidence(items: unknown[] | undefined, transactionAmount: number | undefined) {
+  if (!items) return false;
+
+  return items.some((item) => {
+    if (!isRecord(item)) return false;
+
+    const itemId = typeof item.id === 'string' ? item.id.trim() : '';
+    if (!itemId) return false;
+    if (itemId !== BASIC_PRODUCT_ID) return true;
+
+    if ('unit_price' in item && typeof item.unit_price === 'number' && item.unit_price !== transactionAmount) return true;
+    if ('quantity' in item && item.quantity !== 1) return true;
+    return false;
+  });
+}
+
 export function validateProviderPayment(
   payment: ProviderPayment,
   expectedBusinessId?: string,
@@ -134,16 +154,12 @@ export function validateProviderPayment(
   const reference = typeof payment.external_reference === 'string' ? payment.external_reference.trim() : '';
   const businessId = reference.split(':', 1)[0];
   const items = payment.additional_info?.items;
-  const basicItem = items?.find((candidate) => candidate.id === BASIC_PRODUCT_ID);
+  const basicItem = items?.find((candidate) => isRecord(candidate) && candidate.id === BASIC_PRODUCT_ID);
   const acceptedPricesARS = getAcceptedBasicPricesARS();
   const hasValidReference = Boolean(reference) && businessId && Types.ObjectId.isValid(businessId);
   const hasValidAmount = typeof payment.transaction_amount === 'number' &&
     acceptedPricesARS.includes(payment.transaction_amount);
-  const optionalItemMatches = !items || (
-    basicItem !== undefined &&
-    basicItem.unit_price === payment.transaction_amount &&
-    basicItem.quantity === 1
-  );
+  const optionalItemMatches = !hasConflictingOptionalItemEvidence(items, payment.transaction_amount);
   const hasProductEvidence = localAttempt?.productId === BASIC_PRODUCT_ID || basicItem !== undefined;
   const fail = (reasonCode: PaymentValidationReasonCode): never => {
     throw new PaymentValidationError(reasonCode, getPaymentValidationDiagnostics(payment, reasonCode, Boolean(localAttempt)));
