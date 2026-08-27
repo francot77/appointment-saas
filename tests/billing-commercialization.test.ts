@@ -12,6 +12,13 @@ const validPayment = {
   status: 'approved',
   additional_info: { items: [{ id: 'basic-monthly', unit_price: 10000, quantity: 1 }] },
 };
+const localBasicAttempt = {
+  businessId,
+  amount: 10000,
+  currency: 'ARS',
+  attemptReference: validPayment.external_reference,
+  productId: 'basic-monthly',
+};
 
 describe('billing commercialization integrity', () => {
   it('persists the safe checkout-attempt contract without provider payload fields', () => {
@@ -60,9 +67,9 @@ describe('billing commercialization integrity', () => {
   });
 
   it('accepts the server-owned product and amount only', () => {
-    expect(validateProviderPayment(validPayment, businessId).attemptReference).toBe(`${businessId}:attempt-1`);
-    expect(() => validateProviderPayment({ ...validPayment, transaction_amount: 999 }, businessId)).toThrow('PAYMENT_INVALID');
-    expect(() => validateProviderPayment({ ...validPayment, currency_id: 'USD' }, businessId)).toThrow('PAYMENT_INVALID');
+    expect(validateProviderPayment(validPayment, businessId, localBasicAttempt).attemptReference).toBe(`${businessId}:attempt-1`);
+    expect(() => validateProviderPayment({ ...validPayment, transaction_amount: 999 }, businessId, localBasicAttempt)).toThrow('PAYMENT_INVALID');
+    expect(() => validateProviderPayment({ ...validPayment, currency_id: 'USD' }, businessId, localBasicAttempt)).toThrow('PAYMENT_INVALID');
   });
 
   it('selects safe reason codes while keeping the client error generic', () => {
@@ -75,13 +82,11 @@ describe('billing commercialization integrity', () => {
     expect(reason({ ...validPayment, external_reference: 'not-a-business-reference' })?.reasonCode).toBe('INVALID_EXTERNAL_REFERENCE');
     expect(reason({ ...validPayment, currency_id: 'USD' })?.reasonCode).toBe('WRONG_CURRENCY');
     expect(reason({ ...validPayment, transaction_amount: 999 })?.reasonCode).toBe('AMOUNT_NOT_ACCEPTED');
+    expect(reason({ ...validPayment })?.reasonCode).toBe('LOCAL_ATTEMPT_MISSING');
     expect(reason({ ...validPayment, preference_id: 'other' }, {
       businessId, amount: 10000, currency: 'ARS', attemptReference: validPayment.external_reference,
       preferenceId: 'expected', productId: 'basic-monthly',
     })?.reasonCode).toBe('PREFERENCE_MISMATCH');
-    expect(reason({ ...validPayment, additional_info: { items: [{ id: 'basic-monthly', unit_price: 9999, quantity: 1 }] } }, {
-      businessId, amount: 10000, currency: 'ARS', attemptReference: validPayment.external_reference, productId: 'basic-monthly',
-    })?.reasonCode).toBe('OPTIONAL_ITEM_MISMATCH');
     expect(reason({ ...validPayment }, {
       businessId, amount: 10000, currency: 'ARS', attemptReference: validPayment.external_reference,
       productId: 'other',
@@ -115,24 +120,15 @@ describe('billing commercialization integrity', () => {
     }
   });
 
-  it('rejects explicit conflicting optional provider item evidence with typed reasons', () => {
-    const localAttempt = {
-      businessId,
-      amount: 10000,
-      currency: 'ARS',
-      attemptReference: `${businessId}:attempt-1`,
-      productId: 'basic-monthly',
-    };
-    const reason = (items: unknown[]) => {
-      try {
-        validateProviderPayment({ ...validPayment, additional_info: { items } }, businessId, localAttempt);
-        return null;
-      } catch (error) {
-        return error instanceof PaymentValidationError ? error.reasonCode : null;
-      }
-    };
-    expect(reason([{ id: 'basic-monthly', unit_price: 9999, quantity: 1 }])).toBe('OPTIONAL_ITEM_MISMATCH');
-    expect(reason([{ id: 'basic-monthly', unit_price: 10000, quantity: 2 }])).toBe('OPTIONAL_ITEM_MISMATCH');
+  it('ignores all optional provider item metadata during Basic reconciliation', () => {
+    for (const items of [
+      [{ id: 'basic-monthly', unit_price: 9999, quantity: 1 }],
+      [{ id: 'basic-monthly', unit_price: 10000, quantity: 2 }],
+      [{ id: 'provider-generated-item-id', unit_price: 1, quantity: 99 }],
+      [{ title: 'Plan básico' }],
+    ]) {
+      expect(validateProviderPayment({ ...validPayment, additional_info: { items } }, businessId, localBasicAttempt).nextStatus).toBe('approved');
+    }
   });
 
   it('uses the tenant-scoped local attempt as the product and amount authority', () => {

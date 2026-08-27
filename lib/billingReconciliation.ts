@@ -29,7 +29,6 @@ export const PAYMENT_VALIDATION_REASON_CODES = [
   'LOCAL_PRODUCT_MISMATCH',
   'LOCAL_CURRENCY_AMOUNT_MISMATCH',
   'PREFERENCE_MISMATCH',
-  'OPTIONAL_ITEM_MISMATCH',
 ] as const;
 
 export type PaymentValidationReasonCode = typeof PAYMENT_VALIDATION_REASON_CODES[number];
@@ -123,29 +122,6 @@ export function calculatePaymentPeriodTo(paidUntil: Date | undefined, now: Date,
   return new Date(currentPaidUntil.getTime() + periodMonths * 30 * 24 * 60 * 60 * 1000);
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function hasConflictingOptionalItemEvidence(items: unknown[] | undefined, transactionAmount: number | undefined) {
-  if (!items) return false;
-
-  return items.some((item) => {
-    if (!isRecord(item)) return false;
-
-    const itemId = typeof item.id === 'string' ? item.id.trim() : '';
-    if (!itemId) return false;
-    // Mercado Pago may return provider-generated or otherwise partial item IDs.
-    // They are optional evidence, not a product authority. Only the explicitly
-    // recognized Basic item can provide a meaningful contradiction here.
-    if (itemId !== BASIC_PRODUCT_ID) return false;
-
-    if ('unit_price' in item && typeof item.unit_price === 'number' && item.unit_price !== transactionAmount) return true;
-    if ('quantity' in item && item.quantity !== 1) return true;
-    return false;
-  });
-}
-
 export function validateProviderPayment(
   payment: ProviderPayment,
   expectedBusinessId?: string,
@@ -156,14 +132,10 @@ export function validateProviderPayment(
     : '';
   const reference = typeof payment.external_reference === 'string' ? payment.external_reference.trim() : '';
   const businessId = reference.split(':', 1)[0];
-  const items = payment.additional_info?.items;
-  const basicItem = items?.find((candidate) => isRecord(candidate) && candidate.id === BASIC_PRODUCT_ID);
   const acceptedPricesARS = getAcceptedBasicPricesARS();
   const hasValidReference = Boolean(reference) && businessId && Types.ObjectId.isValid(businessId);
   const hasValidAmount = typeof payment.transaction_amount === 'number' &&
     acceptedPricesARS.includes(payment.transaction_amount);
-  const optionalItemMatches = !hasConflictingOptionalItemEvidence(items, payment.transaction_amount);
-  const hasProductEvidence = localAttempt?.productId === BASIC_PRODUCT_ID || basicItem !== undefined;
   const fail = (reasonCode: PaymentValidationReasonCode): never => {
     throw new PaymentValidationError(reasonCode, getPaymentValidationDiagnostics(payment, reasonCode, Boolean(localAttempt)));
   };
@@ -173,12 +145,11 @@ export function validateProviderPayment(
   if (expectedBusinessId && businessId !== expectedBusinessId) fail('EXPECTED_BUSINESS_MISMATCH');
   if (payment.currency_id !== 'ARS') fail('WRONG_CURRENCY');
   if (!hasValidAmount) fail('AMOUNT_NOT_ACCEPTED');
-  if (localAttempt && (String(localAttempt.businessId) !== businessId || localAttempt.attemptReference !== reference)) fail('LOCAL_ATTEMPT_MISMATCH');
-  if (localAttempt && localAttempt.productId !== BASIC_PRODUCT_ID) fail('LOCAL_PRODUCT_MISMATCH');
-  if (localAttempt && (localAttempt.currency !== 'ARS' || !acceptedPricesARS.includes(localAttempt.amount) || payment.transaction_amount !== localAttempt.amount)) fail('LOCAL_CURRENCY_AMOUNT_MISMATCH');
-  if (localAttempt && localAttempt.preferenceId && payment.preference_id && localAttempt.preferenceId !== payment.preference_id) fail('PREFERENCE_MISMATCH');
-  if (!hasProductEvidence) fail('LOCAL_PRODUCT_MISMATCH');
-  if (!optionalItemMatches) fail('OPTIONAL_ITEM_MISMATCH');
+  const attempt = localAttempt ?? fail('LOCAL_ATTEMPT_MISSING');
+  if (String(attempt.businessId) !== businessId || attempt.attemptReference !== reference) fail('LOCAL_ATTEMPT_MISMATCH');
+  if (attempt.productId !== BASIC_PRODUCT_ID) fail('LOCAL_PRODUCT_MISMATCH');
+  if (attempt.currency !== 'ARS' || !acceptedPricesARS.includes(attempt.amount) || payment.transaction_amount !== attempt.amount) fail('LOCAL_CURRENCY_AMOUNT_MISMATCH');
+  if (attempt.preferenceId && payment.preference_id && attempt.preferenceId !== payment.preference_id) fail('PREFERENCE_MISMATCH');
   return { businessId, attemptReference: reference, nextStatus: normalizeStatus(payment.status as string) };
 }
 

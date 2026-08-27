@@ -85,11 +85,18 @@ describe('billing payment configuration', () => {
       status: 'approved',
       additional_info: { items: [{ id: 'basic-monthly', unit_price: amount, quantity: 1 }] },
     });
-    expect(() => validateProviderPayment(payment(100))).not.toThrow();
-    expect(() => validateProviderPayment(payment(10000))).not.toThrow();
+    const localAttempt = (amount: number) => ({
+      businessId: '507f1f77bcf86cd799439011',
+      amount,
+      currency: 'ARS',
+      attemptReference: '507f1f77bcf86cd799439011',
+      productId: 'basic-monthly',
+    });
+    expect(() => validateProviderPayment(payment(100), undefined, localAttempt(100))).not.toThrow();
+    expect(() => validateProviderPayment(payment(10000), undefined, localAttempt(10000))).not.toThrow();
 
     vi.stubEnv('MP_ACCEPTED_PRICES_ARS', '10000');
-    expect(() => validateProviderPayment(payment(100))).toThrow('PAYMENT_INVALID');
+    expect(() => validateProviderPayment(payment(100), undefined, localAttempt(100))).toThrow('PAYMENT_INVALID');
   });
 
   it('rejects malformed accepted-price configuration in production', () => {
