@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { removeSavedAppointmentByToken, saveAppointment } from '@/lib/clientAppointmentsStorage';
 import { Alert, EmptyState, LoadingState, Status } from '@/app/components/ui/feedback';
@@ -36,6 +36,12 @@ type Slot = {
 
 type Props = { token: string };
 
+type AppointmentRequest = {
+  id: number;
+  token: string;
+  controller: AbortController;
+};
+
 export default function MagicLinkClient({ token }: Props) {
   const router = useRouter();
   const [appt, setAppt] = useState<AppointmentClient | null>(null);
@@ -48,14 +54,29 @@ export default function MagicLinkClient({ token }: Props) {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const activeAppointmentRequestRef = useRef<AppointmentRequest | null>(null);
+  const appointmentRequestIdRef = useRef(0);
 
   useEffect(() => {
     loadAppointment();
+    return () => {
+      const activeRequest = activeAppointmentRequestRef.current;
+      if (activeRequest?.token === token) {
+        activeRequest.controller.abort();
+        activeAppointmentRequestRef.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   async function loadAppointment() {
+    activeAppointmentRequestRef.current?.controller.abort();
     const controller = new AbortController();
+    const requestId = ++appointmentRequestIdRef.current;
+    activeAppointmentRequestRef.current = { id: requestId, token, controller };
+    const isCurrentRequest = () =>
+      activeAppointmentRequestRef.current?.id === requestId &&
+      activeAppointmentRequestRef.current?.token === token;
     const timeout = window.setTimeout(() => controller.abort(), 10000);
     setLoading(true);
     setError(null);
@@ -68,6 +89,8 @@ export default function MagicLinkClient({ token }: Props) {
         signal: controller.signal,
       });
        const json = await res.json();
+
+      if (!isCurrentRequest()) return;
 
       if (!res.ok) {
         if (res.status === 404 || res.status === 410) removeSavedAppointmentByToken(token);
@@ -98,6 +121,7 @@ export default function MagicLinkClient({ token }: Props) {
         setAppt(json);
       setDate(json.date);
     } catch (e) {
+      if (!isCurrentRequest()) return;
       console.error(e);
       setError(
         e instanceof DOMException && e.name === 'AbortError'
@@ -107,7 +131,10 @@ export default function MagicLinkClient({ token }: Props) {
       setAppt(null);
     } finally {
       window.clearTimeout(timeout);
-      setLoading(false);
+      if (isCurrentRequest()) {
+        activeAppointmentRequestRef.current = null;
+        setLoading(false);
+      }
     }
   }
 

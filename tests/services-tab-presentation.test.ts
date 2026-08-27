@@ -50,6 +50,31 @@ describe('services tab presentation contract', () => {
     expect(servicesTab).toContain('step={5}');
   });
 
+  it('serializes visibility mutations per service while keeping other services independent', () => {
+    expect(servicesTab).toContain('pendingToggleIds');
+    expect(servicesTab).toContain(
+      'if (pendingToggleIdsRef.current.has(service.id)) return;',
+    );
+    expect(servicesTab).toContain('disabled={pendingToggleIds.has(s.id)}');
+    expect(servicesTab).toContain('pendingToggleIdsRef.current');
+  });
+
+  it('accepts empty successful mutation responses and refreshes authoritative service data', () => {
+    expect(servicesTab).toContain('readMutationResponse(res)');
+    expect(servicesTab).toContain("if (!body.trim()) return null;");
+    expect(servicesTab).toContain('const refreshed = await loadServices();');
+    expect(servicesTab).toContain('if (refreshed) resetForm();');
+    expect(servicesTab).toContain('setServices(list);');
+  });
+
+  it('retains list and edit context when a post-mutation refresh fails', () => {
+    expect(servicesTab).not.toContain('setServices([]);');
+    expect(servicesTab).toContain('async function loadServices(): Promise<boolean>');
+    expect(servicesTab).toContain('return false;');
+    expect(servicesTab).toContain('return true;');
+    expect(servicesTab).toContain('if (refreshed && editing?.id === service.id)');
+  });
+
   it('preserves Spanish copy, parent brand input, and native dialog focus contract', () => {
     expect(servicesTab).toContain('brand?: BrandConfig');
     expect(servicesTab).toContain('theme.primary');
@@ -66,7 +91,6 @@ describe('services tab presentation contract', () => {
 
   it('keeps the authorized source boundary', () => {
     expect(presentation).not.toContain('SettingsTab');
-    expect(servicesTab).toContain('setServices([]);');
-    expect(servicesTab).toContain('if (editing?.id === service.id)');
+    expect(servicesTab).toContain('editing?.id === service.id');
   });
 });

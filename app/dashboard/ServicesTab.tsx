@@ -23,6 +23,15 @@ type Props = {
   brand?: BrandConfig;
 };
 
+async function readMutationResponse(res: Response) {
+  const body = await res.text();
+  if (!res.ok) {
+    throw new Error('mutation');
+  }
+  if (!body.trim()) return null;
+  return JSON.parse(body);
+}
+
 export default function ServicesTab({ brand }: Props) {
   const theme = brand ?? DEFAULT_BRAND;
 
@@ -39,6 +48,10 @@ export default function ServicesTab({ brand }: Props) {
     isActive: true,
   });
   const [saving, setSaving] = useState(false);
+  const [pendingToggleIds, setPendingToggleIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const pendingToggleIdsRef = useRef(new Set<string>());
   const [deleteTarget, setDeleteTarget] = useState<Service | null>(null);
   const deleteDialogRef = useRef<HTMLDialogElement>(null);
   const deleteCancelRef = useRef<HTMLButtonElement>(null);
@@ -69,7 +82,7 @@ export default function ServicesTab({ brand }: Props) {
     });
   }
 
-  async function loadServices() {
+  async function loadServices(): Promise<boolean> {
     setLoading(true);
     setError(null);
     try {
@@ -91,10 +104,11 @@ export default function ServicesTab({ brand }: Props) {
         })) ?? [];
 
       setServices(list);
+      return true;
     } catch (e: any) {
       console.error(e);
       setError(serviceError('load'));
-      setServices([]);
+      return false;
     } finally {
       setLoading(false);
     }
@@ -135,14 +149,10 @@ export default function ServicesTab({ brand }: Props) {
         body: JSON.stringify(body),
       });
 
-      await res.json();
+      await readMutationResponse(res);
 
-      if (!res.ok) {
-        throw new Error('save');
-      }
-
-      await loadServices();
-      resetForm();
+      const refreshed = await loadServices();
+      if (refreshed) resetForm();
     } catch (e: any) {
       console.error(e);
       setError(serviceError('save'));
@@ -152,6 +162,9 @@ export default function ServicesTab({ brand }: Props) {
   }
 
   async function toggleActive(service: Service) {
+    if (pendingToggleIdsRef.current.has(service.id)) return;
+    pendingToggleIdsRef.current.add(service.id);
+    setPendingToggleIds(new Set(pendingToggleIdsRef.current));
     try {
       const res = await fetch(`/api/admin/services/${service.id}`, {
         method: 'PATCH',
@@ -159,19 +172,14 @@ export default function ServicesTab({ brand }: Props) {
         body: JSON.stringify({ active: !service.isActive }),
       });
 
-      await res.json();
-      if (!res.ok) {
-        throw new Error('update');
-      }
-
-      setServices((prev) =>
-        prev.map((s) =>
-          s.id === service.id ? { ...s, isActive: !s.isActive } : s
-        )
-      );
+      await readMutationResponse(res);
+      await loadServices();
     } catch (e) {
       console.error(e);
       setError(serviceError('update'));
+    } finally {
+      pendingToggleIdsRef.current.delete(service.id);
+      setPendingToggleIds(new Set(pendingToggleIdsRef.current));
     }
   }
 
@@ -203,13 +211,9 @@ export default function ServicesTab({ brand }: Props) {
       const res = await fetch(`/api/admin/services/${service.id}`, {
         method: 'DELETE',
       });
-      await res.json();
-      if (!res.ok) {
-        throw new Error('delete');
-      }
-
-      await loadServices();
-      if (editing?.id === service.id) {
+      await readMutationResponse(res);
+      const refreshed = await loadServices();
+      if (refreshed && editing?.id === service.id) {
         resetForm();
       }
     } catch (e) {
@@ -425,6 +429,7 @@ export default function ServicesTab({ brand }: Props) {
                 <button
                   type="button"
                   onClick={() => toggleActive(s)}
+                  disabled={pendingToggleIds.has(s.id)}
                   className="text-[11px] px-2.5 py-1 rounded-full border border-[var(--color-border)] text-[var(--color-content)] hover:bg-[var(--color-surface)]"
                 >
                   {s.isActive ? 'Ocultar' : 'Mostrar'}

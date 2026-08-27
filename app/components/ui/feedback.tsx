@@ -48,9 +48,12 @@ export type EmptyStateProps = {
 };
 
 export function EmptyState({ title, description, action }: EmptyStateProps) {
+  const id = useId();
+  const titleId = `empty-state-title-${id}`;
+
   return (
-    <section className="empty-state" aria-labelledby="empty-state-title">
-      <h2 id="empty-state-title">{title}</h2>
+    <section className="empty-state" aria-labelledby={titleId}>
+      <h2 id={titleId}>{title}</h2>
       {description && <div>{description}</div>}
       {action && <div>{action}</div>}
     </section>

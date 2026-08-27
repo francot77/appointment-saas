@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Alert, EmptyState, LoadingState, Status } from '../components/ui/feedback';
 import MessagingSettingsCard from './MessagingSettingsCard';
+import { normalizeSlugInput } from '../../lib/slug';
 
 type Settings = {
   id: string;
@@ -110,14 +111,18 @@ export default function SettingsTab() {
 
   useEffect(() => {
     let cancelled = false;
-    const value = slug.trim();
+    const candidate = normalizeSlugInput(slug);
+    const ownedSlug = normalizeSlugInput(persistedSlug);
+    const value = candidate;
 
     if (!value) {
+      setSlugChecking(false);
       setSlugCheck(null);
       return;
     }
 
-    if (value === persistedSlug) {
+    if (value === ownedSlug) {
+      setSlugChecking(false);
       setSlugCheck({ available: true, slug: value, code: 'OWN' });
       return;
     }
@@ -146,6 +151,7 @@ export default function SettingsTab() {
     return () => {
       cancelled = true;
       clearTimeout(t);
+      setSlugChecking(false);
     };
   }, [slug, persistedSlug]);
 
@@ -158,7 +164,7 @@ export default function SettingsTab() {
       const res = await fetch('/api/admin/slug', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug }),
+        body: JSON.stringify({ slug: normalizeSlugInput(slug) }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -167,7 +173,7 @@ export default function SettingsTab() {
         return;
       }
 
-      const nextSlug = String(json.slug || slug);
+      const nextSlug = normalizeSlugInput(String(json.slug || slug));
       setSlug(nextSlug);
       setPersistedSlug(nextSlug);
       setSlugCheck({ available: true, slug: nextSlug, code: 'OWN' });
@@ -217,7 +223,8 @@ export default function SettingsTab() {
     setSaveState('unsaved');
   }
 
-  const publicSlug = persistedSlug;
+  const publicSlug = normalizeSlugInput(persistedSlug);
+  const slugIsOwned = normalizeSlugInput(slug) === normalizeSlugInput(persistedSlug);
 
   async function copyPublicUrl() {
     if (!publicSlug || typeof window === 'undefined') return;
@@ -330,8 +337,8 @@ export default function SettingsTab() {
         <section className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 sm:p-6" aria-labelledby="sharing-title">
           <div className="mb-5"><h3 id="sharing-title" className="text-lg font-semibold text-[var(--color-content)]">Compartir tu página</h3><p className="mt-1 text-sm leading-6 text-[var(--color-content-muted)]">Esta dirección es la que podés enviar por WhatsApp, redes o agregar a tu bio.</p></div>
           <label htmlFor="slug" className="text-sm font-medium text-[var(--color-content)]">Dirección pública</label><p className="mt-1 text-sm text-[var(--color-content-muted)]">Elegí una dirección corta y fácil de recordar.</p>
-          <div className="mt-2 flex flex-col gap-3 sm:flex-row"><input id="slug" value={slug} onChange={(e) => { setSlug(e.target.value); setSlugSavedMsg(null); setSlugError(null); }} className={fieldClass} placeholder="mi-negocio" aria-describedby="slug-help slug-status" /><button type="button" onClick={handleSaveSlug} disabled={slugSaving || slugChecking || !slug || (slugCheck ? !slugCheck.available : true) || slug.trim() === persistedSlug} className="rounded-full bg-[var(--color-action)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{slugSaving ? 'Guardando...' : 'Guardar dirección'}</button></div>
-          <div id="slug-status" className="mt-2" aria-live="polite">{slugChecking && <Status tone="info" label="Revisando disponibilidad..." />}{!slugChecking && slugCheck?.available && slug.trim() !== persistedSlug && <Status tone="success" label="Esta dirección está disponible." />}{!slugChecking && slugCheck && !slugCheck.available && <Status tone="danger" label={slugCheck.error || 'Esta dirección no está disponible.'} />}{slugError && <Alert tone="danger" role="alert">{slugError}</Alert>}{slugSavedMsg && <Status tone="success" label={slugSavedMsg} />}</div>
+          <div className="mt-2 flex flex-col gap-3 sm:flex-row"><input id="slug" value={slug} onChange={(e) => { setSlug(e.target.value); setSlugSavedMsg(null); setSlugError(null); }} className={fieldClass} placeholder="mi-negocio" aria-describedby="slug-help slug-status" /><button type="button" onClick={handleSaveSlug} disabled={slugSaving || slugChecking || !slug || (slugCheck ? !slugCheck.available : true) || slugIsOwned} className="rounded-full bg-[var(--color-action)] px-4 py-2 text-sm font-medium text-white disabled:opacity-50">{slugSaving ? 'Guardando...' : 'Guardar dirección'}</button></div>
+          <div id="slug-status" className="mt-2" aria-live="polite">{slugChecking && <Status tone="info" label="Revisando disponibilidad..." />}{!slugChecking && slugCheck?.available && !slugIsOwned && <Status tone="success" label="Esta dirección está disponible." />}{!slugChecking && slugCheck && !slugCheck.available && <Status tone="danger" label={slugCheck.error || 'Esta dirección no está disponible.'} />}{slugError && <Alert tone="danger" role="alert">{slugError}</Alert>}{slugSavedMsg && <Status tone="success" label={slugSavedMsg} />}</div>
           <p id="slug-help" className="mt-3 text-sm leading-6 text-[var(--color-content-muted)]">Solo letras, números y guiones. Si la cambiás, los links que ya compartiste pueden dejar de funcionar. Avisales a tus clientes antes de hacerlo.</p>
         </section>
 

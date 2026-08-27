@@ -74,13 +74,42 @@ describe('SettingsTab messaging and sticky-save presentation contract', () => {
     expect(messagingCard).toContain('...(accessToken ? { accessToken } : {})');
     expect(messagingCard).toContain('min="0" max="10080"');
     expect(messagingCard).toContain('autoComplete="new-password"');
-    expect(messagingCard).toContain("['confirmed', 'Confirmation template']");
-    expect(messagingCard).toContain("['rescheduled', 'Reschedule template']");
-    expect(messagingCard).toContain("['reminder', 'Reminder template']");
+    expect(messagingCard).toContain("['confirmed', 'Plantilla de confirmación']");
+    expect(messagingCard).toContain("['rescheduled', 'Plantilla de reprogramación']");
+    expect(messagingCard).toContain("['reminder', 'Plantilla de recordatorio']");
     expect(messagingCard).toContain('disabled={saving}');
-    expect(messagingCard).toContain('Save messaging settings');
+    expect(messagingCard).toContain('Guardar configuración de mensajería');
     expect(settingsTab).toContain('<MessagingSettingsCard />');
     expect(settingsTab).not.toContain('<MessagingSettingsCard saving=');
+  });
+
+  it('uses Spanish owner copy and semantic presentation tokens', () => {
+    expect(messagingCard).toContain('Mensajería automática');
+    expect(messagingCard).toContain('Conexión de WhatsApp');
+    expect(messagingCard).toContain('Usá plantillas aprobadas de Meta para confirmaciones y recordatorios.');
+    expect(messagingCard).toContain("'Conectado' : 'Desconectado'");
+    expect(messagingCard).toContain('ID del remitente');
+    expect(messagingCard).toContain('ID de WABA');
+    expect(messagingCard).toContain('Habilitar confirmaciones y recordatorios de turnos');
+    expect(messagingCard).toContain('Anticipación del recordatorio (minutos)');
+    expect(messagingCard).toContain('Token de acceso');
+    expect(messagingCard).toContain('Solo escritura; nunca se muestra');
+    expect(messagingCard).toContain('Plantillas aprobadas');
+    expect(messagingCard).toContain('No configurada');
+    expect(messagingCard).toContain('Mejorar plan');
+    expect(messagingCard).toContain("saving ? 'Guardando...' : 'Guardar configuración de mensajería'");
+    expect(messagingCard).toContain('var(--color-');
+    expect(messagingCard).not.toMatch(/(?:slate|red|emerald|indigo)-/);
+  });
+
+  it('preserves server error passthrough and connection state semantics', () => {
+    expect(messagingCard).toContain("json.error || 'Messaging settings are unavailable.'");
+    expect(messagingCard).toContain("json.error || 'We could not save messaging settings.'");
+    expect(messagingCard).toContain('setError(next.error || null)');
+    expect(messagingCard).toContain("view?.status === 'connected'");
+    expect(messagingCard).toContain("'Conectado' : 'Desconectado'");
+    expect(messagingCard).toContain('var(--color-success-background)');
+    expect(messagingCard).toContain('var(--color-danger-background)');
   });
 
   it('preserves the no-props parent contract and excludes browser claims', () => {

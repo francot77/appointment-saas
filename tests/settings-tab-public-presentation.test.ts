@@ -74,16 +74,32 @@ describe('settings tab public presentation contract', () => {
     expect(settingsTab).toContain("fetch('/api/admin/slug')");
     expect(settingsTab).toContain('fetch(`/api/admin/slug?slug=${encodeURIComponent(value)}`)');
     expect(settingsTab).toContain("method: 'PATCH'");
-    expect(settingsTab).toContain('body: JSON.stringify({ slug })');
+    expect(settingsTab).toContain('body: JSON.stringify({ slug: normalizeSlugInput(slug) })');
     expect(settingsTab).toContain('}, 450);');
     expect(settingsTab).toContain('let cancelled = false;');
     expect(settingsTab).toContain('cancelled = true;');
     expect(settingsTab).toContain("code: 'OWN'");
-    expect(settingsTab).toContain('slugSaving || slugChecking || !slug || (slugCheck ? !slugCheck.available : true) || slug.trim() === persistedSlug');
+    expect(settingsTab).toContain('slugSaving || slugChecking || !slug || (slugCheck ? !slugCheck.available : true) || slugIsOwned');
     expect(settingsTab).toContain("setSaveState('unsaved')");
     expect(settingsTab).toContain("setSaveState('saving')");
     expect(settingsTab).toContain("setSaveState('saved')");
     expect(settingsTab).toContain("setSaveState('error')");
+  });
+
+  it('canonicalizes slug ownership, availability, save gating, and submission', () => {
+    expect(settingsTab).toContain("import { normalizeSlugInput } from '../../lib/slug'");
+    expect(settingsTab).toContain('const candidate = normalizeSlugInput(slug)');
+    expect(settingsTab).toContain('const ownedSlug = normalizeSlugInput(persistedSlug)');
+    expect(settingsTab).toContain('const value = candidate');
+    expect(settingsTab).toContain('body: JSON.stringify({ slug: normalizeSlugInput(slug) })');
+    expect(settingsTab).toContain('const publicSlug = normalizeSlugInput(persistedSlug)');
+    expect(settingsTab).toContain('const slugIsOwned = normalizeSlugInput(slug) === normalizeSlugInput(persistedSlug)');
+  });
+
+  it('settles slug checking for empty, owned, and superseded effect paths', () => {
+    expect(settingsTab).toMatch(/if \(!value\)\s*\{\s*setSlugChecking\(false\);/);
+    expect(settingsTab).toMatch(/if \(value === ownedSlug\)\s*\{\s*setSlugChecking\(false\);\s+setSlugCheck\(\{ available: true, slug: value, code: 'OWN' \}\);/);
+    expect(settingsTab).toMatch(/cancelled = true;\s+clearTimeout\(t\);\s+setSlugChecking\(false\);/);
   });
 
   it('keeps the no-props parent contract and deferred boundaries intact', () => {

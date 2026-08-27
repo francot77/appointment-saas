@@ -59,6 +59,32 @@ describe('frontend design primitives', () => {
     expect(render(React.createElement(EmptyState, { title: 'Nothing here' }))).not.toContain('Create appointment');
   });
 
+  it('gives multiple empty states distinct accessible title references', () => {
+    const markup = render(React.createElement(React.Fragment, null,
+      React.createElement(EmptyState, {
+        title: 'No appointments', description: 'Create one to get started.',
+        action: React.createElement('button', null, 'Create appointment'),
+      }),
+      React.createElement(EmptyState, {
+        title: 'No services', description: 'Add a service to continue.',
+        action: React.createElement('a', { href: '/services/new' }, 'Add service'),
+      }),
+    ));
+    const references = [...markup.matchAll(/aria-labelledby="([^"]+)"/g)].map((match) => match[1]);
+    const titles = [...markup.matchAll(/<h2 id="([^"]+)">/g)].map((match) => match[1]);
+
+    expect(references).toHaveLength(2);
+    expect(titles).toHaveLength(2);
+    expect(new Set(references).size).toBe(2);
+    expect(references).toEqual(titles);
+    expect(markup).toContain('No appointments');
+    expect(markup).toContain('Create one to get started.');
+    expect(markup).toContain('Create appointment');
+    expect(markup).toContain('No services');
+    expect(markup).toContain('Add a service to continue.');
+    expect(markup).toContain('Add service');
+  });
+
   it('renders an open labeled modal and omits closed dialog content', () => {
     const open = render(React.createElement(Dialog, {
       open: true, title: 'Cancel appointment', description: 'This cannot be undone.', closeLabel: 'Close', onClose: () => undefined,
