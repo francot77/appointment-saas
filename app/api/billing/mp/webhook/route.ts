@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import { apiError } from '@/lib/apiError';
-import { reconcileProviderPayment, isSupportedProviderStatus } from '@/lib/billingReconciliation';
+import { getPaymentValidationDiagnostics, PaymentValidationError, reconcileProviderPayment, isSupportedProviderStatus } from '@/lib/billingReconciliation';
 import { logger } from '@/lib/logger';
 import { createMercadoPagoClients, getMercadoPagoAccessToken, MERCADO_PAGO_TIMEOUT_MS } from '@/lib/mercadoPago';
 
@@ -71,11 +71,17 @@ export async function POST(req: NextRequest) {
       status_detail?: string;
       additional_info?: { items?: Array<{ id?: string; unit_price?: number; quantity?: number }> };
     };
-    if (!isSupportedProviderStatus(payment.status)) return apiError('Estado de pago no válido', 422, 'VALIDATION');
+    if (!isSupportedProviderStatus(payment.status)) {
+      logger.error('billing.webhook.invalid', getPaymentValidationDiagnostics(payment, 'UNSUPPORTED_STATUS', false));
+      return apiError('Estado de pago no válido', 422, 'VALIDATION');
+    }
     try {
       await reconcileProviderPayment({ ...payment, id: paymentId });
     } catch (error) {
-      if (error instanceof Error && error.message === 'PAYMENT_INVALID') return apiError('Pago no válido', 422, 'VALIDATION');
+      if (error instanceof PaymentValidationError) {
+        logger.error('billing.webhook.invalid', error.diagnostics);
+        return apiError('Pago no válido', 422, 'VALIDATION');
+      }
       if (error instanceof Error && error.message === 'NO_BUSINESS') return NextResponse.json({ ok: true });
       throw error;
     }

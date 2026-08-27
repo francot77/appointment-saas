@@ -3,8 +3,9 @@ import dbConnect from '@/lib/db';
 import { getCurrentBusiness } from '@/lib/currentBusiness';
 import { Payment } from '@/lib/models/Payments';
 import { apiError } from '@/lib/apiError';
-import { reconcileProviderPayment, toBillingPaymentDTO, type ProviderPayment } from '@/lib/billingReconciliation';
+import { getPaymentValidationDiagnostics, PaymentValidationError, reconcileProviderPayment, toBillingPaymentDTO, type ProviderPayment } from '@/lib/billingReconciliation';
 import { createMercadoPagoClients, getMercadoPagoAccessToken, getMercadoPagoErrorStatus, MERCADO_PAGO_TIMEOUT_MS } from '@/lib/mercadoPago';
+import { logger } from '@/lib/logger';
 
 export const runtime = 'nodejs';
 
@@ -28,7 +29,10 @@ export async function POST(req: NextRequest) {
     if (!reference || reference.length > 150) return apiError('Referencia inválida', 400, 'VALIDATION');
     await dbConnect();
     const local = await Payment.findOne({ businessId: business._id, $or: [{ mpPaymentId: reference }, { preferenceId: reference }, { attemptReference: reference }] }).lean();
-    if (!local) return apiError('Pago no encontrado', 404, 'NOT_FOUND');
+    if (!local) {
+      logger.error('billing.reconcile.invalid', getPaymentValidationDiagnostics(undefined, 'LOCAL_ATTEMPT_MISSING', false));
+      return apiError('Pago no encontrado', 404, 'NOT_FOUND');
+    }
     const accessToken = getMercadoPagoAccessToken();
     if (!accessToken) return apiError('Mercado Pago no configurado', 503, 'INTERNAL');
     const { payment: providerClient } = createMercadoPagoClients(accessToken);
@@ -49,7 +53,10 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof Error && error.message === 'UNAUTHORIZED') return apiError('Unauthorized', 401, 'UNAUTHORIZED');
     if (error instanceof Error && error.message === 'NO_BUSINESS') return apiError('No business', 403, 'FORBIDDEN');
-    if (error instanceof Error && error.message === 'PAYMENT_INVALID') return apiError('Pago no válido', 422, 'VALIDATION');
+    if (error instanceof PaymentValidationError) {
+      logger.error('billing.reconcile.invalid', error.diagnostics);
+      return apiError('Pago no válido', 422, 'VALIDATION');
+    }
     if (getMercadoPagoErrorStatus(error) === 404) return apiError('Pago todavía no disponible', 404, 'NOT_FOUND');
     if (isTransactionUnsupported(error)) {
       return apiError('Reconciliación requiere MongoDB con soporte para transacciones', 503, 'INTERNAL');

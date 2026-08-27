@@ -3,7 +3,9 @@ export type LogContext = Record<string, unknown>;
 
 const SAFE_CONTEXT_KEYS = new Set([
   'requestId', 'businessId', 'appointmentId', 'paymentId', 'provider',
-  'status', 'statusCode', 'code', 'route', 'durationMs', 'errorName',
+  'status', 'statusCode', 'code', 'route', 'durationMs', 'errorName', 'reasonCode',
+  'currency', 'amountARS', 'amountAccepted', 'hasExternalReference', 'hasProviderId',
+  'hasPreferenceId', 'hasOptionalItems', 'localAttemptFound',
 ]);
 
 function safeContext(context: LogContext = {}) {

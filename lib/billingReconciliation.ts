@@ -17,6 +17,48 @@ export type ProviderPayment = {
   };
 };
 
+export const PAYMENT_VALIDATION_REASON_CODES = [
+  'MISSING_PROVIDER_ID',
+  'UNSUPPORTED_STATUS',
+  'INVALID_EXTERNAL_REFERENCE',
+  'EXPECTED_BUSINESS_MISMATCH',
+  'WRONG_CURRENCY',
+  'AMOUNT_NOT_ACCEPTED',
+  'LOCAL_ATTEMPT_MISSING',
+  'LOCAL_ATTEMPT_MISMATCH',
+  'LOCAL_PRODUCT_MISMATCH',
+  'LOCAL_CURRENCY_AMOUNT_MISMATCH',
+  'PREFERENCE_MISMATCH',
+  'OPTIONAL_ITEM_MISMATCH',
+] as const;
+
+export type PaymentValidationReasonCode = typeof PAYMENT_VALIDATION_REASON_CODES[number];
+
+export type PaymentValidationDiagnostics = {
+  reasonCode: PaymentValidationReasonCode;
+  status: 'approved' | 'pending' | 'rejected' | 'cancelled' | 'unknown';
+  currency: 'ARS' | 'other' | 'missing';
+  amountAccepted: boolean;
+  amountARS?: number;
+  hasExternalReference: boolean;
+  hasProviderId: boolean;
+  hasPreferenceId: boolean;
+  hasOptionalItems: boolean;
+  localAttemptFound: boolean;
+};
+
+export class PaymentValidationError extends Error {
+  readonly reasonCode: PaymentValidationReasonCode;
+  readonly diagnostics: PaymentValidationDiagnostics;
+
+  constructor(reasonCode: PaymentValidationReasonCode, diagnostics: Omit<PaymentValidationDiagnostics, 'reasonCode'>) {
+    super('PAYMENT_INVALID');
+    this.name = 'PaymentValidationError';
+    this.reasonCode = reasonCode;
+    this.diagnostics = { reasonCode, ...diagnostics };
+  }
+}
+
 export type LocalPaymentAttempt = {
   businessId: unknown;
   amount: number;
@@ -43,6 +85,35 @@ export function isSupportedProviderStatus(status: string | undefined) {
   return status === 'approved' || status === 'pending' || status === 'rejected' || status === 'cancelled';
 }
 
+export function getPaymentValidationDiagnostics(
+  payment: ProviderPayment | undefined,
+  reasonCode: PaymentValidationReasonCode,
+  localAttemptFound: boolean,
+): PaymentValidationDiagnostics {
+  const amount = payment?.transaction_amount;
+  let accepted = false;
+  try {
+    accepted = typeof amount === 'number' && getAcceptedBasicPricesARS().includes(amount);
+  } catch {
+    // Diagnostics must remain available even when billing configuration is invalid.
+  }
+  const status = payment?.status;
+  const externalReference = typeof payment?.external_reference === 'string' ? payment.external_reference.trim() : '';
+  const preferenceId = typeof payment?.preference_id === 'string' ? payment.preference_id.trim() : '';
+  return {
+    reasonCode,
+    status: isSupportedProviderStatus(status) ? status : 'unknown',
+    currency: payment?.currency_id === 'ARS' ? 'ARS' : typeof payment?.currency_id === 'string' && payment.currency_id ? 'other' : 'missing',
+    amountAccepted: accepted,
+    ...(accepted ? { amountARS: amount } : {}),
+    hasExternalReference: Boolean(externalReference),
+    hasProviderId: Boolean(payment && (typeof payment.id === 'string' || typeof payment.id === 'number') && String(payment.id).trim()),
+    hasPreferenceId: Boolean(preferenceId),
+    hasOptionalItems: Array.isArray(payment?.additional_info?.items),
+    localAttemptFound,
+  };
+}
+
 function normalizeStatus(status: string) {
   return status === 'approved' ? 'approved' as const : status === 'rejected' || status === 'cancelled' ? 'rejected' as const : 'pending' as const;
 }
@@ -60,7 +131,7 @@ export function validateProviderPayment(
   const paymentId = typeof payment.id === 'string' || typeof payment.id === 'number'
     ? String(payment.id).trim()
     : '';
-  const reference = payment.external_reference || '';
+  const reference = typeof payment.external_reference === 'string' ? payment.external_reference.trim() : '';
   const businessId = reference.split(':', 1)[0];
   const items = payment.additional_info?.items;
   const basicItem = items?.find((candidate) => candidate.id === BASIC_PRODUCT_ID);
@@ -68,26 +139,27 @@ export function validateProviderPayment(
   const hasValidReference = Boolean(reference) && businessId && Types.ObjectId.isValid(businessId);
   const hasValidAmount = typeof payment.transaction_amount === 'number' &&
     acceptedPricesARS.includes(payment.transaction_amount);
-  const localMatches = !localAttempt || (
-    String(localAttempt.businessId) === businessId &&
-    localAttempt.attemptReference === reference &&
-    localAttempt.productId === BASIC_PRODUCT_ID &&
-    localAttempt.currency === 'ARS' &&
-    acceptedPricesARS.includes(localAttempt.amount) &&
-    payment.transaction_amount === localAttempt.amount &&
-    (!localAttempt.preferenceId || !payment.preference_id || localAttempt.preferenceId === payment.preference_id)
-  );
   const optionalItemMatches = !items || (
     basicItem !== undefined &&
     basicItem.unit_price === payment.transaction_amount &&
     basicItem.quantity === 1
   );
   const hasProductEvidence = localAttempt?.productId === BASIC_PRODUCT_ID || basicItem !== undefined;
-  if (!paymentId || !isSupportedProviderStatus(payment.status) || !hasValidReference ||
-      (expectedBusinessId && businessId !== expectedBusinessId) || payment.currency_id !== 'ARS' ||
-      !hasValidAmount || !hasProductEvidence || !localMatches || !optionalItemMatches) {
-    throw new Error('PAYMENT_INVALID');
-  }
+  const fail = (reasonCode: PaymentValidationReasonCode): never => {
+    throw new PaymentValidationError(reasonCode, getPaymentValidationDiagnostics(payment, reasonCode, Boolean(localAttempt)));
+  };
+  if (!paymentId) fail('MISSING_PROVIDER_ID');
+  if (!isSupportedProviderStatus(payment.status)) fail('UNSUPPORTED_STATUS');
+  if (!hasValidReference) fail('INVALID_EXTERNAL_REFERENCE');
+  if (expectedBusinessId && businessId !== expectedBusinessId) fail('EXPECTED_BUSINESS_MISMATCH');
+  if (payment.currency_id !== 'ARS') fail('WRONG_CURRENCY');
+  if (!hasValidAmount) fail('AMOUNT_NOT_ACCEPTED');
+  if (localAttempt && (String(localAttempt.businessId) !== businessId || localAttempt.attemptReference !== reference)) fail('LOCAL_ATTEMPT_MISMATCH');
+  if (localAttempt && localAttempt.productId !== BASIC_PRODUCT_ID) fail('LOCAL_PRODUCT_MISMATCH');
+  if (localAttempt && (localAttempt.currency !== 'ARS' || !acceptedPricesARS.includes(localAttempt.amount) || payment.transaction_amount !== localAttempt.amount)) fail('LOCAL_CURRENCY_AMOUNT_MISMATCH');
+  if (localAttempt && localAttempt.preferenceId && payment.preference_id && localAttempt.preferenceId !== payment.preference_id) fail('PREFERENCE_MISMATCH');
+  if (!hasProductEvidence) fail('LOCAL_PRODUCT_MISMATCH');
+  if (!optionalItemMatches) fail('OPTIONAL_ITEM_MISMATCH');
   return { businessId, attemptReference: reference, nextStatus: normalizeStatus(payment.status as string) };
 }
 
@@ -105,14 +177,14 @@ export async function reconcileProviderPayment(
   const paymentId = typeof payment.id === 'string' || typeof payment.id === 'number'
     ? String(payment.id).trim()
     : '';
-  if (!paymentId) throw new Error('PAYMENT_INVALID');
+  if (!paymentId) throw new PaymentValidationError('MISSING_PROVIDER_ID', getPaymentValidationDiagnostics(payment, 'MISSING_PROVIDER_ID', false));
 
-  const reference = payment.external_reference || '';
+  const reference = typeof payment.external_reference === 'string' ? payment.external_reference.trim() : '';
   const businessId = reference.split(':', 1)[0];
   const localAttempt = knownAttempt ?? (reference && businessId && Types.ObjectId.isValid(businessId)
     ? await Payment.findOne({ businessId, attemptReference: reference }).lean()
     : undefined);
-  if (!localAttempt) throw new Error('PAYMENT_INVALID');
+  if (!localAttempt) throw new PaymentValidationError('LOCAL_ATTEMPT_MISSING', getPaymentValidationDiagnostics(payment, 'LOCAL_ATTEMPT_MISSING', false));
   const { businessId: validatedBusinessId, attemptReference, nextStatus } = validateProviderPayment(
     payment,
     expectedBusinessId,

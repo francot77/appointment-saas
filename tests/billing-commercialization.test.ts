@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculatePaymentPeriodTo, isValidPaymentTransition, toBillingPaymentDTO, validateProviderPayment } from '@/lib/billingReconciliation';
+import { calculatePaymentPeriodTo, isValidPaymentTransition, PaymentValidationError, toBillingPaymentDTO, validateProviderPayment } from '@/lib/billingReconciliation';
 import { Payment } from '@/lib/models/Payments';
 import { buildBasicPreferenceBody, createMercadoPagoClients, createMercadoPagoConfig, getMercadoPagoErrorStatus, MERCADO_PAGO_TIMEOUT_MS } from '@/lib/mercadoPago';
 
@@ -64,6 +64,36 @@ describe('billing commercialization integrity', () => {
     expect(() => validateProviderPayment({ ...validPayment, transaction_amount: 999 }, businessId)).toThrow('PAYMENT_INVALID');
     expect(() => validateProviderPayment({ ...validPayment, additional_info: { items: [{ id: 'premium-monthly', unit_price: 10000, quantity: 1 }] } }, businessId)).toThrow('PAYMENT_INVALID');
     expect(() => validateProviderPayment({ ...validPayment, currency_id: 'USD' }, businessId)).toThrow('PAYMENT_INVALID');
+  });
+
+  it('selects safe reason codes while keeping the client error generic', () => {
+    const reason = (payment: Record<string, unknown>, local?: { businessId: string; amount: number; currency: string; attemptReference: string; preferenceId?: string; productId: string }) => {
+      try { validateProviderPayment(payment as never, businessId, local); return null; }
+      catch (error) { return error instanceof PaymentValidationError ? error : null; }
+    };
+    expect(reason({ ...validPayment, id: undefined })?.reasonCode).toBe('MISSING_PROVIDER_ID');
+    expect(reason({ ...validPayment, status: 'in_process' })?.reasonCode).toBe('UNSUPPORTED_STATUS');
+    expect(reason({ ...validPayment, external_reference: 'not-a-business-reference' })?.reasonCode).toBe('INVALID_EXTERNAL_REFERENCE');
+    expect(reason({ ...validPayment, currency_id: 'USD' })?.reasonCode).toBe('WRONG_CURRENCY');
+    expect(reason({ ...validPayment, transaction_amount: 999 })?.reasonCode).toBe('AMOUNT_NOT_ACCEPTED');
+    expect(reason({ ...validPayment, preference_id: 'other' }, {
+      businessId, amount: 10000, currency: 'ARS', attemptReference: validPayment.external_reference,
+      preferenceId: 'expected', productId: 'basic-monthly',
+    })?.reasonCode).toBe('PREFERENCE_MISMATCH');
+    expect(reason({ ...validPayment, additional_info: { items: [{ id: 'other', unit_price: 10000, quantity: 1 }] } }, {
+      businessId, amount: 10000, currency: 'ARS', attemptReference: validPayment.external_reference, productId: 'basic-monthly',
+    })?.reasonCode).toBe('OPTIONAL_ITEM_MISMATCH');
+    expect(reason({ ...validPayment }, {
+      businessId, amount: 10000, currency: 'ARS', attemptReference: validPayment.external_reference,
+      productId: 'other',
+    })?.reasonCode).toBe('LOCAL_PRODUCT_MISMATCH');
+    expect(reason({ ...validPayment, transaction_amount: 10000 }, {
+      businessId, amount: 10000, currency: 'ARS', attemptReference: `${businessId}:other-attempt`, productId: 'basic-monthly',
+    })?.reasonCode).toBe('LOCAL_ATTEMPT_MISMATCH');
+    expect(reason({ ...validPayment }, {
+      businessId, amount: 999, currency: 'ARS', attemptReference: validPayment.external_reference, productId: 'basic-monthly',
+    })?.reasonCode).toBe('LOCAL_CURRENCY_AMOUNT_MISMATCH');
+    expect(reason({ ...validPayment, id: undefined })?.message).toBe('PAYMENT_INVALID');
   });
 
   it('accepts an approved payment when optional provider items are absent', () => {
