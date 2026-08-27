@@ -62,7 +62,6 @@ describe('billing commercialization integrity', () => {
   it('accepts the server-owned product and amount only', () => {
     expect(validateProviderPayment(validPayment, businessId).attemptReference).toBe(`${businessId}:attempt-1`);
     expect(() => validateProviderPayment({ ...validPayment, transaction_amount: 999 }, businessId)).toThrow('PAYMENT_INVALID');
-    expect(() => validateProviderPayment({ ...validPayment, additional_info: { items: [{ id: 'premium-monthly', unit_price: 10000, quantity: 1 }] } }, businessId)).toThrow('PAYMENT_INVALID');
     expect(() => validateProviderPayment({ ...validPayment, currency_id: 'USD' }, businessId)).toThrow('PAYMENT_INVALID');
   });
 
@@ -80,7 +79,7 @@ describe('billing commercialization integrity', () => {
       businessId, amount: 10000, currency: 'ARS', attemptReference: validPayment.external_reference,
       preferenceId: 'expected', productId: 'basic-monthly',
     })?.reasonCode).toBe('PREFERENCE_MISMATCH');
-    expect(reason({ ...validPayment, additional_info: { items: [{ id: 'other', unit_price: 10000, quantity: 1 }] } }, {
+    expect(reason({ ...validPayment, additional_info: { items: [{ id: 'basic-monthly', unit_price: 9999, quantity: 1 }] } }, {
       businessId, amount: 10000, currency: 'ARS', attemptReference: validPayment.external_reference, productId: 'basic-monthly',
     })?.reasonCode).toBe('OPTIONAL_ITEM_MISMATCH');
     expect(reason({ ...validPayment }, {
@@ -96,7 +95,7 @@ describe('billing commercialization integrity', () => {
     expect(reason({ ...validPayment, id: undefined })?.message).toBe('PAYMENT_INVALID');
   });
 
-  it('accepts an approved payment when optional provider items are absent', () => {
+  it('accepts an approved payment when optional provider items are absent, partial, or unrecognized', () => {
     const localAttempt = {
       businessId,
       amount: 10000,
@@ -104,7 +103,14 @@ describe('billing commercialization integrity', () => {
       attemptReference: `${businessId}:attempt-1`,
       productId: 'basic-monthly',
     };
-    for (const additional_info of [undefined, { items: [] }, { items: [{ title: 'Plan básico', quantity: 1 }] }, { items: [{ title: 'Plan básico', unit_price: 10000 }] }]) {
+    for (const additional_info of [
+      undefined,
+      { items: [] },
+      { items: [{ title: 'Plan básico', quantity: 1 }] },
+      { items: [{ title: 'Plan básico', unit_price: 10000 }] },
+      { items: [{ id: 'provider-generated-item-id', unit_price: 10000, quantity: 1 }] },
+      { items: [{ product_id: 'provider-generated-product-id', title: 'Plan básico' }] },
+    ]) {
       expect(validateProviderPayment({ ...validPayment, additional_info }, businessId, localAttempt).nextStatus).toBe('approved');
     }
   });
@@ -125,7 +131,6 @@ describe('billing commercialization integrity', () => {
         return error instanceof PaymentValidationError ? error.reasonCode : null;
       }
     };
-    expect(reason([{ id: 'premium-monthly', unit_price: 10000, quantity: 1 }])).toBe('OPTIONAL_ITEM_MISMATCH');
     expect(reason([{ id: 'basic-monthly', unit_price: 9999, quantity: 1 }])).toBe('OPTIONAL_ITEM_MISMATCH');
     expect(reason([{ id: 'basic-monthly', unit_price: 10000, quantity: 2 }])).toBe('OPTIONAL_ITEM_MISMATCH');
   });

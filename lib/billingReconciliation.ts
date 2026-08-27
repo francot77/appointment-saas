@@ -135,7 +135,10 @@ function hasConflictingOptionalItemEvidence(items: unknown[] | undefined, transa
 
     const itemId = typeof item.id === 'string' ? item.id.trim() : '';
     if (!itemId) return false;
-    if (itemId !== BASIC_PRODUCT_ID) return true;
+    // Mercado Pago may return provider-generated or otherwise partial item IDs.
+    // They are optional evidence, not a product authority. Only the explicitly
+    // recognized Basic item can provide a meaningful contradiction here.
+    if (itemId !== BASIC_PRODUCT_ID) return false;
 
     if ('unit_price' in item && typeof item.unit_price === 'number' && item.unit_price !== transactionAmount) return true;
     if ('quantity' in item && item.quantity !== 1) return true;
