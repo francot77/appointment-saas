@@ -45,8 +45,7 @@ export async function POST() {
 
     console.log('[MP CHECKOUT] Creating preference', {
       businessId: business._id.toString(),
-        price: basicPriceARS,
-      appUrl,
+      price: basicPriceARS,
       environment: isProduction ? 'production' : 'test',
     });
 
@@ -68,7 +67,21 @@ export async function POST() {
       );
     }
 
-    await Payment.updateOne({ _id: attempt._id, businessId: business._id }, { $set: { preferenceId: String(pref.id) } });
+    const preferenceId = typeof pref.id === 'string' || typeof pref.id === 'number'
+      ? String(pref.id).trim()
+      : '';
+    if (!preferenceId) {
+      console.error('[MP CHECKOUT] Missing provider identifier', {
+        errorName: 'ProviderResponseError',
+        errorCode: 'MISSING_PREFERENCE_ID',
+      });
+      return NextResponse.json(
+        { error: 'No se obtuvo una referencia de Mercado Pago' },
+        { status: 502 }
+      );
+    }
+
+    await Payment.updateOne({ _id: attempt._id, businessId: business._id }, { $set: { preferenceId } });
 
     console.log('[MP CHECKOUT] Preference created successfully', {
       preferenceId: pref.id,
@@ -81,8 +94,13 @@ export async function POST() {
       return NextResponse.json({ error: 'BILLING_CONFIGURATION_ERROR' }, { status: 500 });
     }
 
+    const errorRecord = typeof err === 'object' && err !== null ? err as { code?: unknown } : undefined;
+    const errorCode = typeof errorRecord?.code === 'string' || typeof errorRecord?.code === 'number'
+      ? String(errorRecord.code)
+      : undefined;
     console.error('[MP CHECKOUT] failed', {
-      error: err instanceof Error ? err.name : 'unknown',
+      errorName: err instanceof Error ? err.name : 'unknown',
+      ...(errorCode ? { errorCode } : {}),
     });
     return NextResponse.json(
       { error: 'ERROR_CREATING_PREFERENCE' },

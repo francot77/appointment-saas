@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isValidPaymentTransition, validateProviderPayment } from '@/lib/billingReconciliation';
+import { isValidPaymentTransition, toBillingPaymentDTO, validateProviderPayment } from '@/lib/billingReconciliation';
 import { Payment } from '@/lib/models/Payments';
 import { buildBasicPreferenceBody, createMercadoPagoClients, createMercadoPagoConfig, getMercadoPagoErrorStatus, MERCADO_PAGO_TIMEOUT_MS } from '@/lib/mercadoPago';
 
@@ -21,6 +21,42 @@ describe('billing commercialization integrity', () => {
     expect(Payment.schema.path('productVersion').isRequired).toBe(true);
     expect(Payment.schema.path('periodMonths').isRequired).toBe(true);
     expect(Payment.schema.path('rawProviderPayload')).toBeUndefined();
+  });
+
+  it('leaves provider identifiers absent on pending attempts and allows multiple attempts', async () => {
+    const first = new Payment({
+      businessId,
+      amount: 10000,
+      attemptReference: `${businessId}:attempt-1`,
+      status: 'pending',
+      periodFrom: new Date(),
+      periodTo: new Date(),
+      productId: 'basic-monthly',
+      providerStatus: 'created',
+    });
+    const second = new Payment({ ...first.toObject(), _id: undefined, attemptReference: `${businessId}:attempt-2` });
+    await expect(first.validate()).resolves.toBeUndefined();
+    await expect(second.validate()).resolves.toBeUndefined();
+    expect(first.mpPaymentId).toBeUndefined();
+    expect(first.preferenceId).toBeUndefined();
+    expect(first.toObject()).not.toHaveProperty('mpPaymentId');
+    expect(first.toObject()).not.toHaveProperty('preferenceId');
+  });
+
+  it('uniquely indexes only non-empty provider identifiers', () => {
+    const indexes = Payment.schema.indexes();
+    expect(indexes).toEqual(expect.arrayContaining([
+      [{ mpPaymentId: 1 }, expect.objectContaining({ unique: true, partialFilterExpression: { mpPaymentId: { $type: 'string', $gt: '' } } })],
+      [{ preferenceId: 1 }, expect.objectContaining({ unique: true, partialFilterExpression: { preferenceId: { $type: 'string', $gt: '' } } })],
+      [{ businessId: 1, attemptReference: 1 }, expect.objectContaining({ unique: true })],
+    ]));
+  });
+
+  it('keeps reconciliation/history references compatible before and after provider IDs arrive', () => {
+    const pending = { _id: 'attempt', status: 'pending' as const, createdAt: new Date(), amount: 10000, currency: 'ARS', attemptReference: `${businessId}:attempt-1`, periodTo: new Date(), mpPaymentId: undefined };
+    const resolved = { ...pending, mpPaymentId: 'payment-1' };
+    expect(toBillingPaymentDTO(pending).providerReference).toBe(pending.attemptReference);
+    expect(toBillingPaymentDTO(resolved).providerReference).toBe('payment-1');
   });
 
   it('accepts the server-owned product and amount only', () => {

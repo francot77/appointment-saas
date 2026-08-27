@@ -57,7 +57,9 @@ export function isValidPaymentTransition(current: string | undefined, incoming: 
 
 export async function reconcileProviderPayment(payment: ProviderPayment, expectedBusinessId?: string) {
   const { businessId, attemptReference, nextStatus } = validateProviderPayment(payment, expectedBusinessId);
-  const paymentId = String(payment.id || '');
+  const paymentId = typeof payment.id === 'string' || typeof payment.id === 'number'
+    ? String(payment.id).trim()
+    : '';
   if (!paymentId) throw new Error('PAYMENT_INVALID');
 
   const connection = await Payment.db;
@@ -77,12 +79,15 @@ export async function reconcileProviderPayment(payment: ProviderPayment, expecte
 
       const currentPaidUntil = business.paidUntil && business.paidUntil > now ? business.paidUntil : now;
       const periodTo = new Date(currentPaidUntil.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const preferenceId = typeof payment.preference_id === 'string' && payment.preference_id.trim()
+        ? payment.preference_id.trim()
+        : existing?.preferenceId;
       const fields = {
         amount: payment.transaction_amount,
         currency: payment.currency_id,
         method: 'mp',
         mpPaymentId: paymentId,
-        preferenceId: payment.preference_id || existing?.preferenceId || null,
+        ...(preferenceId ? { preferenceId } : {}),
         attemptReference,
         productVersion: 'v1',
         periodMonths: 1,
@@ -120,7 +125,7 @@ export function toBillingPaymentDTO(payment: {
   createdAt: Date;
   amount: number;
   currency: string;
-  mpPaymentId: string | null;
+  mpPaymentId?: string | null;
   attemptReference: string;
   periodTo: Date;
 }): BillingPaymentDTO {
